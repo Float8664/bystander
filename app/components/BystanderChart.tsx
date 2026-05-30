@@ -72,8 +72,8 @@ export default function BystanderChart({ input }: Props) {
             width={56}
           />
           <Tooltip
-            formatter={(value: number, name: string) => [
-              `${value}%`,
+            formatter={(value, name) => [
+              typeof value === "number" ? `${value}%` : "—",
               name === "real"
                 ? "Реальность (диффузия ответственности)"
                 : "Наивное ожидание",
