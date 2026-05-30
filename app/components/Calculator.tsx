@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Label } from "@/components/ui/label"
 import { computeResult } from "@/src/lib/model/probability"
+import BystanderChart from "./BystanderChart"
 import type {
   BuildingType,
   CulturalContext,
@@ -59,7 +60,7 @@ const DEFAULT: ScenarioInput = {
 
 function parseParams(params: URLSearchParams): ScenarioInput {
   return {
-    neighbors: Math.min(100, Math.max(1, Number(params.get("neighbors") ?? DEFAULT.neighbors))),
+    neighbors: Math.min(50, Math.max(1, Number(params.get("neighbors") ?? DEFAULT.neighbors))),
     position: (params.get("position") as Position) ?? DEFAULT.position,
     buildingType: (params.get("buildingType") as BuildingType) ?? DEFAULT.buildingType,
     timeOfDay: (params.get("timeOfDay") as TimeOfDay) ?? DEFAULT.timeOfDay,
@@ -190,19 +191,19 @@ export default function Calculator() {
             id="neighbors-slider"
             type="range"
             min={1}
-            max={100}
+            max={50}
             step={1}
             value={input.neighbors}
             onChange={(e) => update({ neighbors: Number(e.target.value) })}
             aria-label="Число соседей"
             aria-valuemin={1}
-            aria-valuemax={100}
+            aria-valuemax={50}
             aria-valuenow={input.neighbors}
             className="w-full h-2 rounded-full appearance-none cursor-pointer bg-slate-200 accent-slate-800"
           />
           <div className="flex justify-between text-xs text-slate-400">
             <span>1</span>
-            <span>100</span>
+            <span>50</span>
           </div>
         </div>
 
@@ -277,6 +278,10 @@ export default function Calculator() {
           Не является эмпирически валидированным прогнозом.
         </p>
       </div>
+
+      {/* График */}
+      <BystanderChart input={input} />
+
     </section>
   )
 }
