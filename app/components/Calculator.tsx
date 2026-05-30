@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { Label } from "@/components/ui/label"
 import { computeResult } from "@/src/lib/model/probability"
 import BystanderChart from "./BystanderChart"
+import Explanation from "./Explanation"
 import type {
   BuildingType,
   CulturalContext,
@@ -281,6 +282,9 @@ export default function Calculator() {
 
       {/* График */}
       <BystanderChart input={input} />
+
+      {/* Пояснение */}
+      <Explanation />
 
     </section>
   )
