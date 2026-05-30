@@ -4,6 +4,7 @@ import {
   pIndividual,
   pAtLeastOne,
   computeResult,
+  computeNaive,
 } from '../probability'
 import type { ScenarioInput } from '../types'
 
@@ -142,5 +143,32 @@ describe('golden tests', () => {
     const pInd = pCtx / 3
     expect(result.pIndividual).toBeCloseTo(pInd, 4)
     expect(result.pAtLeastOne).toBeCloseTo(1 - Math.pow(1 - pInd, 3), 4)
+  })
+})
+
+// ─── computeNaive ────────────────────────────────────────────────────────────
+
+describe('computeNaive', () => {
+  it('pIndividual = p_context (без диффузии)', () => {
+    const result = computeNaive(base)
+    expect(result.pIndividual).toBeCloseTo(applyModifiers(base), 10)
+  })
+
+  it('pAtLeastOne наивный >= реального (диффузия только снижает)', () => {
+    const naive = computeNaive(base)
+    const real = computeResult(base)
+    expect(naive.pAtLeastOne).toBeGreaterThanOrEqual(real.pAtLeastOne)
+  })
+
+  it('наивный растёт с ростом N', () => {
+    const ns = [1, 5, 10, 20, 50]
+    const values = ns.map((n) => computeNaive({ ...base, neighbors: n }).pAtLeastOne)
+    for (let i = 1; i < values.length; i++) {
+      expect(values[i]).toBeGreaterThanOrEqual(values[i - 1])
+    }
+  })
+
+  it('N=0 → pAtLeastOne = 0', () => {
+    expect(computeNaive({ ...base, neighbors: 0 }).pAtLeastOne).toBe(0)
   })
 })

@@ -50,3 +50,16 @@ export function computeResult(input: ScenarioInput): ModelResult {
     pAtLeastOne: pAtLeastOne(input),
   }
 }
+
+/**
+ * «Наивное ожидание»: p_инд не убывает с ростом N (диффузии нет).
+ * Иллюстрирует интуицию «больше людей — точно кто-то поможет».
+ * Возвращает P(хотя бы один) при фиксированном p_context независимо от N.
+ */
+export function computeNaive(input: ScenarioInput): ModelResult {
+  const n = input.neighbors
+  if (n === 0) return { pIndividual: 0, pAtLeastOne: 0 }
+  const pContext = applyModifiers(input)
+  const pAny = clamp(1 - Math.pow(1 - pContext, n))
+  return { pIndividual: pContext, pAtLeastOne: pAny }
+}
