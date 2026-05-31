@@ -276,20 +276,31 @@ export default function Calculator() {
         <h2 className="text-sm font-medium uppercase tracking-widest text-slate-400 mb-4">
           Иллюстративный результат
         </h2>
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-1">
-            <p className="text-xs text-slate-500">
-              Вероятность реакции одного соседа
-            </p>
-            <p className="text-4xl font-bold text-slate-900">{pInd}%</p>
-          </div>
-          <div className="space-y-1">
-            <p className="text-xs text-slate-500">
-              Хотя бы один из {input.neighbors} среагирует
-            </p>
-            <p className="text-4xl font-bold text-slate-900">{pAny}%</p>
-          </div>
+        {/* Главная цифра — итог */}
+        <div className="space-y-1">
+          <p className="text-xs text-slate-500">
+            Шанс, что поможет хоть кто-то
+          </p>
+          <p className="text-5xl font-bold text-slate-900" aria-live="polite">{pAny}%</p>
         </div>
+
+        {/* Фраза-мостик: связывает обе цифры в одну мысль */}
+        <p className="mt-4 text-sm text-slate-600 leading-relaxed" aria-live="polite">
+          Каждый сосед сам по себе среагирует лишь с шансом{" "}
+          <span className="font-semibold text-slate-800">{pInd}%</span> —
+          каждый надеется, что это сделает кто-то другой.
+          Но соседей{" "}
+          <span className="font-semibold text-slate-800">{input.neighbors}</span>,
+          поэтому шанс, что среагирует хоть кто-нибудь, —{" "}
+          <span className="font-semibold text-slate-800">{pAny}%</span>.
+        </p>
+
+        {/* Вспомогательная цифра — объяснение */}
+        <div className="mt-3 space-y-0.5">
+          <p className="text-xs text-slate-400">Шанс одного конкретного соседа</p>
+          <p className="text-xl font-semibold text-slate-400">{pInd}%</p>
+        </div>
+
         {/* Динамическое объяснение текущего выбора */}
         <p className="mt-3 text-sm text-slate-500 leading-relaxed" aria-live="polite">
           {getWhyText(input)}
