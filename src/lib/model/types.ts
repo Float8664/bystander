@@ -12,6 +12,7 @@ export interface ScenarioInput {
   severity: Severity
   culturalContext: CulturalContext
   acquaintance: boolean  // true = соседи знают друг друга, false = незнакомцы
+  addressed: boolean     // true = обращаюсь к конкретному человеку, false = зову в пустоту
 }
 
 export interface ModelResult {

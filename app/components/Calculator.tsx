@@ -60,6 +60,7 @@ const DEFAULT: ScenarioInput = {
   severity: "moderate",
   culturalContext: "mixed",
   acquaintance: false,
+  addressed: false,
 }
 
 function parseParams(params: URLSearchParams): ScenarioInput {
@@ -71,6 +72,7 @@ function parseParams(params: URLSearchParams): ScenarioInput {
     severity: (params.get("severity") as Severity) ?? DEFAULT.severity,
     culturalContext: (params.get("culturalContext") as CulturalContext) ?? DEFAULT.culturalContext,
     acquaintance: params.get("acquaintance") === "true",
+    addressed: params.get("addressed") === "true",
   }
 }
 
@@ -154,6 +156,7 @@ export default function Calculator() {
           severity: next.severity,
           culturalContext: next.culturalContext,
           acquaintance: String(next.acquaintance),
+          addressed: String(next.addressed),
         })
         router.replace(`?${params.toString()}`, { scroll: false })
       }, 400)
@@ -289,6 +292,32 @@ export default function Calculator() {
               className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-sm
                 transform transition-transform duration-200
                 ${input.acquaintance ? "translate-x-5" : "translate-x-0"}`}
+            />
+          </button>
+        </div>
+
+        {/* Тумблер адресного обращения */}
+        <div className={`flex items-center justify-between pt-1 pb-1 px-3 rounded-xl transition-colors
+          ${input.addressed ? "bg-blue-50 border border-blue-200" : ""}`}>
+          <span className="text-sm font-medium text-slate-700 flex items-center">
+            Обращаюсь к конкретному соседу
+            <Hint text="«Эй, ты, в синей куртке, вызови скорую» — личное обращение снимает «пусть поможет кто-то другой». Посмотри, как изменится график." />
+          </span>
+          <button
+            role="switch"
+            aria-checked={input.addressed}
+            aria-label="Обращаюсь к конкретному соседу"
+            onClick={() => update({ addressed: !input.addressed })}
+            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent
+              transition-colors duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2
+              focus-visible:outline-blue-600
+              ${input.addressed ? "bg-blue-600" : "bg-slate-200"}`}
+          >
+            <span
+              aria-hidden="true"
+              className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-sm
+                transform transition-transform duration-200
+                ${input.addressed ? "translate-x-5" : "translate-x-0"}`}
             />
           </button>
         </div>

@@ -40,6 +40,7 @@ export default function BystanderChart({ input }: Props) {
     input.position,
     input.culturalContext,
     input.acquaintance,
+    input.addressed,
   ])
 
   const currentReal = data[input.neighbors - 1]

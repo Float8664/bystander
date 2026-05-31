@@ -13,6 +13,7 @@ const scenarios: { label: string; input: ScenarioInput }[] = [
       severity: 'moderate',
       culturalContext: 'mixed',
       acquaintance: false,
+      addressed: false,
     },
   },
   {
@@ -25,6 +26,7 @@ const scenarios: { label: string; input: ScenarioInput }[] = [
       severity: 'moderate',
       culturalContext: 'mixed',
       acquaintance: false,
+      addressed: false,
     },
   },
   {
@@ -37,6 +39,7 @@ const scenarios: { label: string; input: ScenarioInput }[] = [
       severity: 'serious',
       culturalContext: 'high_solidarity',
       acquaintance: false,
+      addressed: false,
     },
   },
 ]

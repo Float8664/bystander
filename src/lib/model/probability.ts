@@ -2,6 +2,7 @@ import {
   BASE_P,
   DIFFUSION_K,
   ACQUAINTANCE_FACTOR,
+  ADDRESSED_DIFFUSION_REMOVAL,
   MODIFIER_SEVERITY,
   MODIFIER_TIME_OF_DAY,
   MODIFIER_BUILDING_TYPE,
@@ -41,14 +42,32 @@ export function pIndividual(input: ScenarioInput): number {
 export function pAtLeastOne(input: ScenarioInput): number {
   const n = input.neighbors
   if (n === 0) return 0
+
+  if (input.addressed) {
+    // Адресный режим: один конкретный адресат почти не подвержен диффузии.
+    // p_addressee = p_context (ADDRESSED_DIFFUSION_REMOVAL=1.0 → диффузия снята полностью).
+    // Остальные N−1 соседей — как обычно (с диффузией).
+    // Формула: 1 − (1 − p_addr) × (1 − p_regular)^(N−1)
+    const pAddr    = clamp(applyModifiers(input) * (
+      ADDRESSED_DIFFUSION_REMOVAL + (1 - ADDRESSED_DIFFUSION_REMOVAL) * diffusion(n)
+    ))
+    if (n === 1) return pAddr
+    const pRegular = pIndividual(input)
+    return clamp(1 - (1 - pAddr) * Math.pow(1 - pRegular, n - 1))
+  }
+
   const pInd = pIndividual(input)
   return clamp(1 - Math.pow(1 - pInd, n))
 }
 
 /** Главная функция: возвращает ModelResult для заданного сценария */
 export function computeResult(input: ScenarioInput): ModelResult {
+  // В адресном режиме pIndividual = шанс адресата (без диффузии)
+  const pInd = input.addressed
+    ? clamp(applyModifiers(input))
+    : pIndividual(input)
   return {
-    pIndividual: pIndividual(input),
+    pIndividual: pInd,
     pAtLeastOne: pAtLeastOne(input),
   }
 }

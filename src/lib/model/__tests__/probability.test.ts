@@ -16,6 +16,7 @@ const base: ScenarioInput = {
   severity: 'moderate',
   culturalContext: 'mixed',
   acquaintance: false,
+  addressed: false,
 }
 
 // ─── Инварианты диапазона ───────────────────────────────────────────────────
@@ -210,6 +211,61 @@ describe('acquaintance', () => {
   it('инварианты [0,1] при acquaintance=true', () => {
     for (const n of [1, 5, 10, 50]) {
       const r = computeResult({ ...withAcq, neighbors: n })
+      expect(r.pIndividual).toBeGreaterThanOrEqual(0)
+      expect(r.pIndividual).toBeLessThanOrEqual(1)
+      expect(r.pAtLeastOne).toBeGreaterThanOrEqual(0)
+      expect(r.pAtLeastOne).toBeLessThanOrEqual(1)
+    }
+  })
+})
+
+// ─── addressed ───────────────────────────────────────────────────────────────
+
+describe('addressed', () => {
+  const withAddr    = { ...base, addressed: true }
+  const withoutAddr = { ...base, addressed: false }
+
+  it('addressed=false даёт ровно те же результаты, что прежде (ничего не сломалось)', () => {
+    const ns = [1, 5, 10, 50]
+    for (const n of ns) {
+      const a = computeResult({ ...withoutAddr, neighbors: n })
+      const b = computeResult({ ...base, neighbors: n })
+      expect(a.pIndividual).toBeCloseTo(b.pIndividual, 10)
+      expect(a.pAtLeastOne).toBeCloseTo(b.pAtLeastOne, 10)
+    }
+  })
+
+  it('при addressed=true pAtLeastOne заметно выше, чем при false', () => {
+    const input = { ...base, neighbors: 10 }
+    const addr    = computeResult({ ...input, addressed: true })
+    const noAddr  = computeResult({ ...input, addressed: false })
+    expect(addr.pAtLeastOne).toBeGreaterThan(noAddr.pAtLeastOne + 0.1)
+  })
+
+  it('при addressed=true и N=1: pAtLeastOne = шанс адресата (≈ p_context)', () => {
+    const input = { ...base, neighbors: 1, addressed: true }
+    const result = computeResult(input)
+    const pCtx = applyModifiers(input)
+    expect(result.pAtLeastOne).toBeCloseTo(pCtx, 5)
+  })
+
+  it('при addressed=true кривая почти ровная: pAtLeastOne при N=2 и N=50 близки', () => {
+    const atN2  = computeResult({ ...withAddr, neighbors: 2  }).pAtLeastOne
+    const atN50 = computeResult({ ...withAddr, neighbors: 50 }).pAtLeastOne
+    // Разница < 0.25 — кривая не обваливается, в отличие от неадресного режима
+    expect(Math.abs(atN50 - atN2)).toBeLessThan(0.25)
+  })
+
+  it('при addressed=false кривая обваливается: N=2 vs N=50 разница большая', () => {
+    const atN2  = computeResult({ ...withoutAddr, neighbors: 2  }).pAtLeastOne
+    const atN50 = computeResult({ ...withoutAddr, neighbors: 50 }).pAtLeastOne
+    // В неадресном режиме кривая падает заметно
+    expect(atN2 - atN50).toBeGreaterThan(0.05)
+  })
+
+  it('инварианты [0,1] при addressed=true', () => {
+    for (const n of [1, 2, 5, 10, 50]) {
+      const r = computeResult({ ...withAddr, neighbors: n })
       expect(r.pIndividual).toBeGreaterThanOrEqual(0)
       expect(r.pIndividual).toBeLessThanOrEqual(1)
       expect(r.pAtLeastOne).toBeGreaterThanOrEqual(0)
