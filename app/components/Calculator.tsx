@@ -6,6 +6,8 @@ import { Label } from "@/components/ui/label"
 import { computeResult } from "@/src/lib/model/probability"
 import BystanderChart from "./BystanderChart"
 import Explanation from "./Explanation"
+import Hint from "./Hint"
+import { getWhyText } from "./whyText"
 import type {
   BuildingType,
   CulturalContext,
@@ -78,16 +80,21 @@ function RadioGroup<T extends string>({
   options,
   value,
   onChange,
+  hint,
 }: {
   id: string
   legend: string
   options: { value: T; label: string }[]
   value: T
   onChange: (v: T) => void
+  hint?: string
 }) {
   return (
     <fieldset className="space-y-1">
-      <legend className="text-sm font-medium text-slate-700">{legend}</legend>
+      <legend className="text-sm font-medium text-slate-700">
+        {legend}
+        {hint && <Hint text={hint} />}
+      </legend>
       <div className="flex flex-wrap gap-2 pt-1">
         {options.map((opt) => {
           const inputId = `${id}-${opt.value}`
@@ -217,6 +224,7 @@ export default function Calculator() {
         <RadioGroup
           id="severity"
           legend="Серьёзность ситуации"
+          hint="Незначительная — например, громкая музыка. Умеренная — крик или скандал за стеной. Серьёзная — явная угроза, звон бьющегося стекла, крики о помощи."
           options={SEVERITY_OPTIONS}
           value={input.severity}
           onChange={(v) => update({ severity: v })}
@@ -233,6 +241,7 @@ export default function Calculator() {
         <RadioGroup
           id="buildingType"
           legend="Тип дома"
+          hint="Хрущёвка — тонкие стены, хорошо слышно. Панельный — средняя слышимость, соседи почти незнакомы. Элитный ЖК — толстые стены, высокая анонимность. Частный дом — соседи знают друг друга."
           options={BUILDING_OPTIONS}
           value={input.buildingType}
           onChange={(v) => update({ buildingType: v })}
@@ -241,6 +250,7 @@ export default function Calculator() {
         <RadioGroup
           id="position"
           legend="Квартира"
+          hint="Средняя — больше общих стен с соседями, лучше слышно. Угловая — меньше общих стен, меньше соседей, которые могут что-то заметить."
           options={POSITION_OPTIONS}
           value={input.position}
           onChange={(v) => update({ position: v })}
@@ -249,6 +259,7 @@ export default function Calculator() {
         <RadioGroup
           id="culturalContext"
           legend="Культурный контекст"
+          hint="Высокая солидарность — в этой среде принято вмешиваться и помогать соседям. Смешанная — по-разному. Низкая — в этой среде не принято лезть в чужие дела."
           options={CULTURAL_OPTIONS}
           value={input.culturalContext}
           onChange={(v) => update({ culturalContext: v })}
@@ -279,7 +290,11 @@ export default function Calculator() {
             <p className="text-4xl font-bold text-slate-900">{pAny}%</p>
           </div>
         </div>
-        <p className="mt-4 text-xs text-slate-400 leading-relaxed">
+        {/* Динамическое объяснение текущего выбора */}
+        <p className="mt-3 text-sm text-slate-500 leading-relaxed" aria-live="polite">
+          {getWhyText(input)}
+        </p>
+        <p className="mt-3 text-xs text-slate-400 leading-relaxed">
           Значения иллюстративны. Формула: P = 1 − (1 − p<sub>инд</sub>)<sup>N</sup>,
           где p<sub>инд</sub> убывает с ростом N (диффузия ответственности по Darley &amp; Latané, 1968).
           Не является эмпирически валидированным прогнозом.
