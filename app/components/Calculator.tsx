@@ -180,6 +180,12 @@ export default function Calculator() {
       {/* Форма ввода */}
       <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-6">
 
+        {/* Провокация перед ползунком */}
+        <p className="text-sm text-slate-500 italic">
+          Как думаешь: чем больше соседей, тем выше шанс на помощь — или нет?
+          Поставь число и посмотри.
+        </p>
+
         {/* Слайдер числа соседей */}
         <div className="space-y-3">
           <Label htmlFor="neighbors-slider" className="text-sm font-medium text-slate-700">
