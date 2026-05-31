@@ -15,6 +15,7 @@ const base: ScenarioInput = {
   timeOfDay: 'day',
   severity: 'moderate',
   culturalContext: 'mixed',
+  acquaintance: false,
 }
 
 // ─── Инварианты диапазона ───────────────────────────────────────────────────
@@ -170,5 +171,49 @@ describe('computeNaive', () => {
 
   it('N=0 → pAtLeastOne = 0', () => {
     expect(computeNaive({ ...base, neighbors: 0 }).pAtLeastOne).toBe(0)
+  })
+})
+
+// ─── acquaintance ─────────────────────────────────────────────────────────────
+
+describe('acquaintance', () => {
+  const withAcq    = { ...base, acquaintance: true }
+  const withoutAcq = { ...base, acquaintance: false }
+
+  it('при acquaintance=true pIndividual выше, чем при false (N>1)', () => {
+    const input = { ...base, neighbors: 10 }
+    expect(pIndividual({ ...input, acquaintance: true }))
+      .toBeGreaterThan(pIndividual({ ...input, acquaintance: false }))
+  })
+
+  it('при acquaintance=true pAtLeastOne выше, чем при false', () => {
+    const input = { ...base, neighbors: 10 }
+    expect(computeResult({ ...input, acquaintance: true }).pAtLeastOne)
+      .toBeGreaterThan(computeResult({ ...input, acquaintance: false }).pAtLeastOne)
+  })
+
+  it('при acquaintance=true pAtLeastOne убывает с ростом N', () => {
+    const ns = [1, 2, 5, 10, 20, 50]
+    const values = ns.map((n) => pAtLeastOne({ ...withAcq, neighbors: n }))
+    for (let i = 1; i < values.length; i++) {
+      expect(values[i]).toBeLessThanOrEqual(values[i - 1])
+    }
+  })
+
+  it('при N=1 acquaintance=true тоже даёт более высокий pIndividual', () => {
+    // Мультипликативный фактор действует при любом N
+    const a = pIndividual({ ...base, neighbors: 1, acquaintance: true })
+    const b = pIndividual({ ...base, neighbors: 1, acquaintance: false })
+    expect(a).toBeGreaterThan(b)
+  })
+
+  it('инварианты [0,1] при acquaintance=true', () => {
+    for (const n of [1, 5, 10, 50]) {
+      const r = computeResult({ ...withAcq, neighbors: n })
+      expect(r.pIndividual).toBeGreaterThanOrEqual(0)
+      expect(r.pIndividual).toBeLessThanOrEqual(1)
+      expect(r.pAtLeastOne).toBeGreaterThanOrEqual(0)
+      expect(r.pAtLeastOne).toBeLessThanOrEqual(1)
+    }
   })
 })

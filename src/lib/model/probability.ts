@@ -1,6 +1,7 @@
 import {
   BASE_P,
   DIFFUSION_K,
+  ACQUAINTANCE_FACTOR,
   MODIFIER_SEVERITY,
   MODIFIER_TIME_OF_DAY,
   MODIFIER_BUILDING_TYPE,
@@ -29,10 +30,11 @@ export function diffusion(n: number): number {
   return 1 / Math.pow(n, DIFFUSION_K)
 }
 
-/** Вероятность реакции одного конкретного свидетеля с учётом диффузии */
+/** Вероятность реакции одного конкретного свидетеля с учётом диффузии и знакомства */
 export function pIndividual(input: ScenarioInput): number {
   const pContext = applyModifiers(input)
-  return clamp(pContext * diffusion(input.neighbors))
+  const factor = input.acquaintance ? ACQUAINTANCE_FACTOR : 1
+  return clamp(pContext * diffusion(input.neighbors) * factor)
 }
 
 /** Вероятность того, что хотя бы один из N свидетелей среагирует */

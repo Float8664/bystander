@@ -59,6 +59,7 @@ const DEFAULT: ScenarioInput = {
   timeOfDay: "day",
   severity: "moderate",
   culturalContext: "mixed",
+  acquaintance: false,
 }
 
 function parseParams(params: URLSearchParams): ScenarioInput {
@@ -69,6 +70,7 @@ function parseParams(params: URLSearchParams): ScenarioInput {
     timeOfDay: (params.get("timeOfDay") as TimeOfDay) ?? DEFAULT.timeOfDay,
     severity: (params.get("severity") as Severity) ?? DEFAULT.severity,
     culturalContext: (params.get("culturalContext") as CulturalContext) ?? DEFAULT.culturalContext,
+    acquaintance: params.get("acquaintance") === "true",
   }
 }
 
@@ -151,6 +153,7 @@ export default function Calculator() {
           timeOfDay: next.timeOfDay,
           severity: next.severity,
           culturalContext: next.culturalContext,
+          acquaintance: String(next.acquaintance),
         })
         router.replace(`?${params.toString()}`, { scroll: false })
       }, 400)
@@ -264,6 +267,31 @@ export default function Calculator() {
           value={input.culturalContext}
           onChange={(v) => update({ culturalContext: v })}
         />
+
+        {/* Тумблер знакомства */}
+        <div className="flex items-center justify-between pt-1">
+          <span className="text-sm font-medium text-slate-700 flex items-center">
+            Соседи знакомы между собой
+            <Hint text="В доме, где люди знают друг друга, труднее думать «поможет кто-то другой» — сложнее оставаться в стороне, когда знаешь человека лично." />
+          </span>
+          <button
+            role="switch"
+            aria-checked={input.acquaintance}
+            aria-label="Соседи знакомы между собой"
+            onClick={() => update({ acquaintance: !input.acquaintance })}
+            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent
+              transition-colors duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2
+              focus-visible:outline-slate-800
+              ${input.acquaintance ? "bg-slate-800" : "bg-slate-200"}`}
+          >
+            <span
+              aria-hidden="true"
+              className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-sm
+                transform transition-transform duration-200
+                ${input.acquaintance ? "translate-x-5" : "translate-x-0"}`}
+            />
+          </button>
+        </div>
       </div>
 
       {/* Результат */}

@@ -12,6 +12,7 @@ const scenarios: { label: string; input: ScenarioInput }[] = [
       timeOfDay: 'night',
       severity: 'moderate',
       culturalContext: 'mixed',
+      acquaintance: false,
     },
   },
   {
@@ -23,6 +24,7 @@ const scenarios: { label: string; input: ScenarioInput }[] = [
       timeOfDay: 'day',
       severity: 'moderate',
       culturalContext: 'mixed',
+      acquaintance: false,
     },
   },
   {
@@ -34,6 +36,7 @@ const scenarios: { label: string; input: ScenarioInput }[] = [
       timeOfDay: 'day',
       severity: 'serious',
       culturalContext: 'high_solidarity',
+      acquaintance: false,
     },
   },
 ]

@@ -11,6 +11,7 @@ export interface ScenarioInput {
   timeOfDay: TimeOfDay
   severity: Severity
   culturalContext: CulturalContext
+  acquaintance: boolean  // true = соседи знают друг друга, false = незнакомцы
 }
 
 export interface ModelResult {
