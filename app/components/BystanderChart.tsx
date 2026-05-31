@@ -9,7 +9,6 @@ import {
   CartesianGrid,
   Tooltip,
   ReferenceDot,
-  Legend,
   ResponsiveContainer,
 } from "recharts"
 import { computeResult, computeNaive } from "@/src/lib/model/probability"
@@ -42,26 +41,43 @@ export default function BystanderChart({ input }: Props) {
     input.culturalContext,
   ])
 
-  const currentReal  = data[input.neighbors - 1]
+  const currentReal = data[input.neighbors - 1]
 
   return (
     <div
       role="img"
-      aria-label={`График зависимости вероятности от числа соседей. При N=${input.neighbors}: реальная ${currentReal?.real}%, наивная ${data[input.neighbors - 1]?.naive}%.`}
+      aria-label={`График: при N=${input.neighbors} реальный шанс ${currentReal?.real}%, интуитивный ${data[input.neighbors - 1]?.naive}%.`}
       className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
     >
-      <h2 className="text-sm font-medium uppercase tracking-widest text-slate-400 mb-6">
-        Зависимость P(хотя бы один) от числа соседей
+      <h2 className="text-base font-semibold text-slate-800 mb-1">
+        Помогут ли соседи — и как это зависит от их числа
       </h2>
+      <p className="text-xs text-slate-400 mb-4">Меняй параметры выше — кривые обновятся</p>
+
+      {/* Легенда-подписи линий — HTML, не на графике */}
+      <div className="flex gap-5 mb-4 text-xs">
+        <span className="flex items-center gap-1.5 text-slate-800 font-medium">
+          <span className="inline-block w-6 h-0.5 bg-slate-800 rounded" />
+          На самом деле
+        </span>
+        <span className="flex items-center gap-1.5 text-slate-400">
+          <span className="inline-block w-6 border-t-2 border-dashed border-slate-400" />
+          Как нам кажется
+        </span>
+      </div>
+
       <ResponsiveContainer width="100%" height={280}>
-        <LineChart data={data} margin={{ top: 8, right: 16, bottom: 8, left: 0 }}>
+        <LineChart
+          data={data}
+          margin={{ top: 12, right: 16, bottom: 8, left: 0 }}
+        >
           <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
           <XAxis
             dataKey="n"
-            label={{ value: "Число соседей (N)", position: "insideBottom", offset: -4, fontSize: 12, fill: "#94a3b8" }}
+            label={{ value: "Число соседей", position: "insideBottom", offset: -4, fontSize: 12, fill: "#94a3b8" }}
             tick={{ fontSize: 11, fill: "#94a3b8" }}
             tickLine={false}
-            height={48}
+            height={44}
           />
           <YAxis
             domain={[0, 100]}
@@ -74,24 +90,13 @@ export default function BystanderChart({ input }: Props) {
           <Tooltip
             formatter={(value, name) => [
               typeof value === "number" ? `${value}%` : "—",
-              name === "real"
-                ? "Реальность (диффузия ответственности)"
-                : "Наивное ожидание",
+              name === "real" ? "На самом деле" : "Как нам кажется",
             ]}
-            labelFormatter={(n) => `N = ${n}`}
+            labelFormatter={(n) => `Соседей: ${n}`}
             contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #e2e8f0" }}
           />
-          <Legend
-            formatter={(value) =>
-              value === "real"
-                ? "Реальность (диффузия ответственности)"
-                : "Наивное ожидание"
-            }
-            iconType="plainline"
-            wrapperStyle={{ fontSize: 12, paddingTop: 12 }}
-          />
 
-          {/* Пунктирная — наивное ожидание */}
+          {/* Пунктирная — «как нам кажется» */}
           <Line
             type="monotone"
             dataKey="naive"
@@ -100,32 +105,37 @@ export default function BystanderChart({ input }: Props) {
             strokeDasharray="6 3"
             dot={false}
             activeDot={{ r: 3, fill: "#94a3b8" }}
+            isAnimationActive={true}
+            animationDuration={500}
           />
 
-          {/* Сплошная — реальность с диффузией */}
+          {/* Сплошная — «на самом деле» */}
           <Line
             type="monotone"
             dataKey="real"
             stroke="#1e293b"
-            strokeWidth={2}
+            strokeWidth={2.5}
             dot={false}
             activeDot={{ r: 4, fill: "#1e293b" }}
+            isAnimationActive={true}
+            animationDuration={500}
           />
 
-          {/* Точка текущего N на реальной кривой */}
+          {/* Точка текущего N — крупная, движется со слайдером */}
           {currentReal && (
             <ReferenceDot
               x={input.neighbors}
               y={currentReal.real}
-              r={6}
-              fill="#1e293b"
+              r={7}
+              fill="#2563eb"
               stroke="white"
               strokeWidth={2}
               label={{
-                value: `N=${input.neighbors}`,
+                value: `${currentReal.real}%`,
                 position: input.neighbors > 40 ? "left" : "right",
-                fontSize: 11,
-                fill: "#475569",
+                fontSize: 12,
+                fontWeight: 600,
+                fill: "#2563eb",
               }}
             />
           )}
