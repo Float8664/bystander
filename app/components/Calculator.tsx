@@ -2,13 +2,14 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { Label } from "@/components/ui/label"
-import { computeResult } from "@/src/lib/model/probability"
+import { computeResult, computeWitnessCount } from "@/src/lib/model/probability"
+import { BUILDING_DEFAULTS } from "@/src/lib/model/constants"
 import BystanderChart from "./BystanderChart"
 import Explanation from "./Explanation"
 import Hint from "./Hint"
 import { getWhyText } from "./whyText"
 import type {
+  BuildingShape,
   BuildingType,
   CulturalContext,
   Position,
@@ -65,7 +66,10 @@ const DEFAULT: ScenarioInput = {
 
 function parseParams(params: URLSearchParams): ScenarioInput {
   return {
-    neighbors: Math.min(50, Math.max(1, Number(params.get("neighbors") ?? DEFAULT.neighbors))),
+    // neighbors больше не вводится напрямую — он вычисляется из формы дома
+    // (computeWitnessCount). Старые ссылки вида ?neighbors=… просто игнорируются:
+    // это значение всегда перезаписывается вычисленным N. Мягкая деградация, без падения.
+    neighbors: DEFAULT.neighbors,
     position: (params.get("position") as Position) ?? DEFAULT.position,
     buildingType: (params.get("buildingType") as BuildingType) ?? DEFAULT.buildingType,
     timeOfDay: (params.get("timeOfDay") as TimeOfDay) ?? DEFAULT.timeOfDay,
@@ -131,6 +135,15 @@ function RadioGroup<T extends string>({
   )
 }
 
+// Склонение «сосед-свидетель» по числу (форматирование текста, не модель).
+function pluralNeighbors(n: number): string {
+  const mod10 = n % 10
+  const mod100 = n % 100
+  if (mod10 === 1 && mod100 !== 11) return "сосед-свидетель"
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return "соседа-свидетеля"
+  return "соседей-свидетелей"
+}
+
 // ─── Основной компонент ──────────────────────────────────────────────────────
 
 export default function Calculator() {
@@ -141,15 +154,20 @@ export default function Calculator() {
     parseParams(searchParams)
   )
 
+  // Форма дома: из неё вычисляется число соседей-свидетелей N.
+  // Стартует типовыми значениями выбранного типа дома (BUILDING_DEFAULTS).
+  const [shape, setShape] = useState<BuildingShape>(
+    () => BUILDING_DEFAULTS[parseParams(searchParams).buildingType]
+  )
+
   // router.replace дебаунсится — URL обновляется только после паузы в 400ms,
-  // чтобы не дёргать Next.js-роутер на каждый пиксель ползунка
+  // чтобы не дёргать Next.js-роутер на каждое изменение
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const syncUrl = useCallback(
     (next: ScenarioInput) => {
       if (debounceRef.current) clearTimeout(debounceRef.current)
       debounceRef.current = setTimeout(() => {
         const params = new URLSearchParams({
-          neighbors: String(next.neighbors),
           position: next.position,
           buildingType: next.buildingType,
           timeOfDay: next.timeOfDay,
@@ -175,6 +193,15 @@ export default function Calculator() {
     [syncUrl]
   )
 
+  // Смена типа дома сбрасывает форму на типовые значения этого типа.
+  const changeBuildingType = useCallback(
+    (v: BuildingType) => {
+      update({ buildingType: v })
+      setShape(BUILDING_DEFAULTS[v])
+    },
+    [update]
+  )
+
   // При первой загрузке: если URL пустой — записываем дефолты
   useEffect(() => {
     if (searchParams.toString() === "") syncUrl(input)
@@ -182,8 +209,19 @@ export default function Calculator() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Число соседей-свидетелей выводится из формы дома и позиции квартиры.
+  const houseN = useMemo(
+    () => computeWitnessCount(shape, input.position),
+    [shape, input.position]
+  )
+  // Вход для модели: всё из input, но neighbors — это вычисленное N.
+  const modelInput = useMemo<ScenarioInput>(
+    () => ({ ...input, neighbors: houseN }),
+    [input, houseN]
+  )
+
   // computeResult — чистая функция, мемоизируем чтобы не пересчитывать лишний раз
-  const result = useMemo(() => computeResult(input), [input])
+  const result = useMemo(() => computeResult(modelInput), [modelInput])
   const pInd = (result.pIndividual * 100).toFixed(1)
   const pAny = (result.pAtLeastOne * 100).toFixed(1)
 
@@ -193,38 +231,19 @@ export default function Calculator() {
       {/* Форма ввода */}
       <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-6">
 
-        {/* Провокация перед ползунком */}
-        <p className="text-sm text-slate-500 italic">
-          Как думаешь: чем больше соседей, тем выше шанс на помощь — или нет?
-          Поставь число и посмотри.
-        </p>
-
-        {/* Слайдер числа соседей */}
-        <div className="space-y-3">
-          <Label htmlFor="neighbors-slider" className="text-sm font-medium text-slate-700">
-            Число соседей (N):{" "}
-            <span className="font-bold text-slate-900" aria-live="polite">
-              {input.neighbors}
-            </span>
-          </Label>
-          <input
-            id="neighbors-slider"
-            type="range"
-            min={1}
-            max={50}
-            step={1}
-            value={input.neighbors}
-            onChange={(e) => update({ neighbors: Number(e.target.value) })}
-            aria-label="Число соседей"
-            aria-valuemin={1}
-            aria-valuemax={50}
-            aria-valuenow={input.neighbors}
-            className="w-full h-2 rounded-full appearance-none cursor-pointer bg-slate-200 accent-slate-800"
-          />
-          <div className="flex justify-between text-xs text-slate-400">
-            <span>1</span>
-            <span>50</span>
-          </div>
+        {/* Вычисленное число свидетелей — всегда на виду */}
+        <div
+          className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3"
+          aria-live="polite"
+        >
+          <p className="text-sm text-slate-600">
+            В таком доме —{" "}
+            <span className="font-bold text-slate-900">примерно {houseN}</span>{" "}
+            {pluralNeighbors(houseN)}.
+          </p>
+          <p className="mt-1 text-xs text-slate-400">
+            Число считается из параметров дома — настрой их ниже.
+          </p>
         </div>
 
         <RadioGroup
@@ -250,7 +269,7 @@ export default function Calculator() {
           hint="Хрущёвка — тонкие стены, хорошо слышно. Панельный — средняя слышимость, соседи почти незнакомы. Элитный ЖК — толстые стены, высокая анонимность. Частный дом — соседи знают друг друга."
           options={BUILDING_OPTIONS}
           value={input.buildingType}
-          onChange={(v) => update({ buildingType: v })}
+          onChange={changeBuildingType}
         />
 
         <RadioGroup
@@ -347,7 +366,7 @@ export default function Calculator() {
           <span className="font-semibold text-slate-800">{pInd}%</span> —
           каждый надеется, что это сделает кто-то другой.
           Но соседей{" "}
-          <span className="font-semibold text-slate-800">{input.neighbors}</span>,
+          <span className="font-semibold text-slate-800">{houseN}</span>,
           поэтому шанс, что среагирует хоть кто-нибудь, —{" "}
           <span className="font-semibold text-slate-800">{pAny}%</span>.
         </p>
@@ -360,7 +379,7 @@ export default function Calculator() {
 
         {/* Динамическое объяснение текущего выбора */}
         <p className="mt-3 text-sm text-slate-500 leading-relaxed" aria-live="polite">
-          {getWhyText(input)}
+          {getWhyText(modelInput)}
         </p>
         <p className="mt-3 text-xs text-slate-400 leading-relaxed">
           Значения иллюстративны. Формула: P = 1 − (1 − p<sub>инд</sub>)<sup>N</sup>,
@@ -370,7 +389,7 @@ export default function Calculator() {
       </div>
 
       {/* График */}
-      <BystanderChart input={input} />
+      <BystanderChart input={modelInput} houseN={houseN} />
 
       {/* Пояснение */}
       <Explanation />
