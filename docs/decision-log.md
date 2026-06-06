@@ -6,6 +6,38 @@
 
 ---
 
+## Сессия 2026-06-06 — модель: N выводится из формы дома (computeWitnessCount)
+
+**Что сделано:** добавлена чистая функция `computeWitnessCount(shape, position)` в
+`probability.ts`. Число соседей-свидетелей N теперь ВЫВОДИТСЯ из параметров дома, а
+не вводится вручную. Это первый шаг ступени «охвата» (см. `model-rationale.md`).
+
+**Новые типы (`types.ts`):** `WitnessScope` (`whole_building` / `my_entrance` /
+`my_floor_plus_adjacent`) и `BuildingShape` (`apartmentsPerFloor`, `floors`,
+`entrances`, `witnessScope`, `neighboringHouses?`).
+
+**Новые константы (`constants.ts`):**
+- `BUILDING_DEFAULTS` — типовые параметры по типу дома (иллюстративные стартовые дефолты):
+  хрущёвка (3×5, 4 подъезда, my_entrance) → N=14; панель (4×9, 6 подъездов, my_entrance) → N=35;
+  элитный ЖК (6×16, 3 подъезда, my_floor_plus_adjacent) → N=17; частный (neighboringHouses=4) → N=4.
+- `POSITION_REACH_FACTOR` (corner 0.85 / middle 1.0) — множитель ОХВАТА, сознательно
+  отделён от `MODIFIER_POSITION` (тот же 0.85, но влияет на вероятность, а этот — на N).
+- `ADJACENT_FLOORS_SPAN = 3` — этажей в охвате при my_floor_plus_adjacent.
+
+**Архитектурное решение:** `neighbors` в `ScenarioInput` остался как финальное N.
+`BuildingShape` — отдельный тип; UI передаёт N через `computeWitnessCount` (второй заход).
+Ядро (pIndividual / pAtLeastOne / diffusion / acquaintance / addressed) не изменено.
+Потолка на N нет — большой ЖК с whole_building честно даёт сотни свидетелей.
+
+**Тесты:** +18 новых (`witness-count.test.ts`), итого 59/59 зелёных. Покрыты:
+разумные N по типам дома, witnessScope (my_entrance < whole_building), угловая ≤ средняя,
+частный дом = neighboringHouses, эффект свидетеля сохранён на вычисленных N, адресный
+режим сохранён, инварианты [0,1] при N в сотнях.
+
+**UI** не тронут — следующий заход.
+
+---
+
 ## Сессия 2026-06-06 — фикс: тултипы «?» теперь открываются по тапу на мобильных
 
 **Баг:** подсказки `?` (компонент `Hint.tsx`) не открывались на мобильных.
