@@ -183,13 +183,6 @@ export default function BystanderChart({ input, houseN, experimentN }: Props) {
               fill="#2563eb"
               stroke="white"
               strokeWidth={2}
-              label={{
-                value: `ваш дом — ${houseY}%`,
-                position: houseN > axisMax * 0.6 ? "left" : "right",
-                fontSize: 12,
-                fontWeight: 600,
-                fill: "#2563eb",
-              }}
             />
           )}
 
@@ -202,13 +195,6 @@ export default function BystanderChart({ input, houseN, experimentN }: Props) {
               fill="#d97706"
               stroke="white"
               strokeWidth={2}
-              label={{
-                value: `эксперимент — ${experimentY}%`,
-                position: experimentN > axisMax * 0.6 ? "left" : "right",
-                fontSize: 12,
-                fontWeight: 600,
-                fill: "#d97706",
-              }}
             />
           )}
         </LineChart>
