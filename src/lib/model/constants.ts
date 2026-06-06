@@ -1,4 +1,4 @@
-import type { BuildingType, Position, TimeOfDay, Severity, CulturalContext } from './types'
+import type { BuildingType, BuildingShape, Position, TimeOfDay, Severity, CulturalContext } from './types'
 
 // Базовая вероятность реакции одного человека в нейтральных условиях.
 // Иллюстративно: выбрано как умеренно-оптимистичная точка отсчёта.
@@ -53,4 +53,36 @@ export const MODIFIER_CULTURAL_CONTEXT: Record<CulturalContext, number> = {
   high_solidarity: 1.3, // высокая взаимопомощь в сообществе
   mixed:           1.0, // нейтральный референс
   low_solidarity:  0.7, // атомизированное сообщество, низкое доверие
+}
+
+// ─── Охват свидетелей (вывод N из формы дома) ───────────────────────────────
+// Всё ниже — про СТУПЕНЬ ОХВАТА (сколько соседей в принципе заметят), а не про
+// вероятность реакции. Значения иллюстративные, см. docs/model-rationale.md.
+
+// Типовые параметры дома по типу. Это СТАРТОВЫЕ дефолты: во втором заходе
+// пользователь сможет переопределить их в UI. Из этих параметров
+// computeWitnessCount выводит число соседей-свидетелей N.
+export const BUILDING_DEFAULTS: Record<BuildingType, BuildingShape> = {
+  // Хрущёвка: малоэтажная, плотные подъезды. Охват — свой подъезд.
+  khrushchevka: { apartmentsPerFloor: 3, floors: 5,  entrances: 4, witnessScope: 'my_entrance' },
+  // Панель: типовая 9-этажка. Охват — свой подъезд.
+  panel:        { apartmentsPerFloor: 4, floors: 9,  entrances: 6, witnessScope: 'my_entrance' },
+  // Элитный ЖК: высокий, анонимный. Реально слышат лишь ближние этажи —
+  // охват сужен до своего этажа плюс соседних сверху/снизу.
+  elite:        { apartmentsPerFloor: 6, floors: 16, entrances: 3, witnessScope: 'my_floor_plus_adjacent' },
+  // Частный дом: N задаётся напрямую числом соседних домов, форма не используется.
+  private:      { apartmentsPerFloor: 1, floors: 1,  entrances: 1, witnessScope: 'whole_building', neighboringHouses: 4 },
+}
+
+// Сколько соседних этажей попадает в охват при scope='my_floor_plus_adjacent':
+// свой этаж + один выше + один ниже = 3. Иллюстративно.
+export const ADJACENT_FLOORS_SPAN = 3
+
+// Множитель охвата по позиции квартиры. Угловая квартира граничит с меньшим
+// числом соседей, поэтому её круг свидетелей уже. Это про ОХВАТ (число N),
+// и сознательно ОТДЕЛЁН от MODIFIER_POSITION (тот влияет на вероятность реакции).
+// Значения иллюстративные.
+export const POSITION_REACH_FACTOR: Record<Position, number> = {
+  corner: 0.85, // угловая — меньше смежных квартир, уже охват
+  middle: 1.0,  // нейтральный референс
 }

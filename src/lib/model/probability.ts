@@ -8,10 +8,49 @@ import {
   MODIFIER_BUILDING_TYPE,
   MODIFIER_POSITION,
   MODIFIER_CULTURAL_CONTEXT,
+  ADJACENT_FLOORS_SPAN,
+  POSITION_REACH_FACTOR,
 } from './constants'
-import type { ScenarioInput, ModelResult } from './types'
+import type { ScenarioInput, ModelResult, BuildingShape, Position } from './types'
 
 const clamp = (v: number): number => Math.max(0, Math.min(1, v))
+
+/**
+ * Число соседей-свидетелей N, выведенное из формы дома.
+ * Чистая функция: возвращает целое N ≥ 0. Потолка нет — большой ЖК с охватом
+ * на весь дом честно даёт сотни свидетелей. Результат N идёт дальше в
+ * pIndividual/pAtLeastOne БЕЗ изменения их логики.
+ *
+ * Ступень «охвата» (см. docs/model-rationale.md): сколько соседей в принципе
+ * в позиции что-то заметить. Это НЕ вероятность реакции.
+ */
+export function computeWitnessCount(shape: BuildingShape, position: Position): number {
+  // Частный дом: N задаётся напрямую числом соседних домов, форма не используется.
+  if (shape.neighboringHouses !== undefined) {
+    return Math.max(0, Math.round(shape.neighboringHouses))
+  }
+
+  const perEntrance = shape.apartmentsPerFloor * shape.floors // квартир в одном подъезде
+
+  let reach: number
+  switch (shape.witnessScope) {
+    case 'whole_building':
+      reach = perEntrance * shape.entrances // весь дом
+      break
+    case 'my_entrance':
+      reach = perEntrance // только мой подъезд (число подъездов не влияет)
+      break
+    case 'my_floor_plus_adjacent':
+      // мой этаж + соседние сверху/снизу, но не больше, чем этажей в доме
+      reach = shape.apartmentsPerFloor * Math.min(shape.floors, ADJACENT_FLOORS_SPAN)
+      break
+  }
+
+  // −1: своя квартира не считается свидетелем.
+  // Множитель позиции сужает охват угловой квартиры (меньше смежных соседей).
+  const n = (reach - 1) * POSITION_REACH_FACTOR[position]
+  return Math.max(0, Math.round(n))
+}
 
 /** BASE_P × произведение всех модификаторов для данного контекста */
 export function applyModifiers(input: ScenarioInput): number {
