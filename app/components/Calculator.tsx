@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { computeResult, computeWitnessCount } from "@/src/lib/model/probability"
 import { BUILDING_DEFAULTS } from "@/src/lib/model/constants"
@@ -16,6 +16,7 @@ import type {
   ScenarioInput,
   Severity,
   TimeOfDay,
+  WitnessScope,
 } from "@/src/lib/model/types"
 
 // ─── Справочники для отображения ────────────────────────────────────────────
@@ -51,6 +52,12 @@ const CULTURAL_OPTIONS: { value: CulturalContext; label: string }[] = [
   { value: "low_solidarity", label: "Низкая солидарность" },
 ]
 
+const SCOPE_OPTIONS: { value: WitnessScope; label: string }[] = [
+  { value: "whole_building", label: "Весь дом" },
+  { value: "my_entrance", label: "Мой подъезд" },
+  { value: "my_floor_plus_adjacent", label: "Мой этаж и соседи" },
+]
+
 // ─── Значения по умолчанию ───────────────────────────────────────────────────
 
 const DEFAULT: ScenarioInput = {
@@ -77,6 +84,36 @@ function parseParams(params: URLSearchParams): ScenarioInput {
     culturalContext: (params.get("culturalContext") as CulturalContext) ?? DEFAULT.culturalContext,
     acquaintance: params.get("acquaintance") === "true",
     addressed: params.get("addressed") === "true",
+  }
+}
+
+// Форма дома из URL. Если параметров нет — берём типовые значения выбранного типа.
+// Любой кривой ввод мягко откатывается к дефолту (без падения).
+function parseShape(params: URLSearchParams, buildingType: BuildingType): BuildingShape {
+  const def = BUILDING_DEFAULTS[buildingType]
+  const posInt = (key: string, fallback: number): number => {
+    const v = Number(params.get(key))
+    return Number.isFinite(v) && v > 0 ? Math.floor(v) : fallback
+  }
+  const scopeRaw = params.get("scope")
+  const witnessScope: WitnessScope =
+    scopeRaw === "whole_building" || scopeRaw === "my_entrance" || scopeRaw === "my_floor_plus_adjacent"
+      ? scopeRaw
+      : def.witnessScope
+
+  const housesRaw = params.get("houses")
+  // neighboringHouses присутствует только у частного дома (или если явно задан в URL).
+  const neighboringHouses =
+    housesRaw !== null
+      ? Math.max(0, Math.floor(Number(housesRaw)) || 0)
+      : def.neighboringHouses
+
+  return {
+    apartmentsPerFloor: posInt("apf", def.apartmentsPerFloor),
+    floors: posInt("floors", def.floors),
+    entrances: posInt("entrances", def.entrances),
+    witnessScope,
+    ...(neighboringHouses !== undefined ? { neighboringHouses } : {}),
   }
 }
 
@@ -135,6 +172,46 @@ function RadioGroup<T extends string>({
   )
 }
 
+// ─── Подкомпонент: числовое поле с подсказкой ───────────────────────────────
+
+function NumberField({
+  id,
+  label,
+  hint,
+  value,
+  min = 0,
+  onChange,
+}: {
+  id: string
+  label: string
+  hint?: string
+  value: number
+  min?: number
+  onChange: (v: number) => void
+}) {
+  return (
+    <div className="space-y-1">
+      <label htmlFor={id} className="text-sm font-medium text-slate-700 flex items-center">
+        {label}
+        {hint && <Hint text={hint} />}
+      </label>
+      <input
+        id={id}
+        type="number"
+        inputMode="numeric"
+        min={min}
+        value={value}
+        onChange={(e) => {
+          const v = e.target.valueAsNumber
+          onChange(Number.isNaN(v) ? min : Math.max(min, Math.floor(v)))
+        }}
+        className="w-24 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-800
+          focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-500"
+      />
+    </div>
+  )
+}
+
 // Склонение «сосед-свидетель» по числу (форматирование текста, не модель).
 function pluralNeighbors(n: number): string {
   const mod10 = n % 10
@@ -155,59 +232,60 @@ export default function Calculator() {
   )
 
   // Форма дома: из неё вычисляется число соседей-свидетелей N.
-  // Стартует типовыми значениями выбранного типа дома (BUILDING_DEFAULTS).
-  const [shape, setShape] = useState<BuildingShape>(
-    () => BUILDING_DEFAULTS[parseParams(searchParams).buildingType]
+  // Стартует значениями из URL, иначе — типовыми для выбранного типа дома.
+  const [shape, setShape] = useState<BuildingShape>(() =>
+    parseShape(
+      searchParams,
+      (searchParams.get("buildingType") as BuildingType) ?? DEFAULT.buildingType
+    )
   )
 
-  // router.replace дебаунсится — URL обновляется только после паузы в 400ms,
-  // чтобы не дёргать Next.js-роутер на каждое изменение
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const syncUrl = useCallback(
-    (next: ScenarioInput) => {
-      if (debounceRef.current) clearTimeout(debounceRef.current)
-      debounceRef.current = setTimeout(() => {
-        const params = new URLSearchParams({
-          position: next.position,
-          buildingType: next.buildingType,
-          timeOfDay: next.timeOfDay,
-          severity: next.severity,
-          culturalContext: next.culturalContext,
-          acquaintance: String(next.acquaintance),
-          addressed: String(next.addressed),
-        })
-        router.replace(`?${params.toString()}`, { scroll: false })
-      }, 400)
-    },
-    [router]
-  )
+  const update = useCallback((patch: Partial<ScenarioInput>) => {
+    setInput((prev) => ({ ...prev, ...patch }))
+  }, [])
 
-  const update = useCallback(
-    (patch: Partial<ScenarioInput>) => {
-      setInput((prev) => {
-        const next = { ...prev, ...patch }
-        syncUrl(next)
-        return next
-      })
-    },
-    [syncUrl]
-  )
+  const updateShape = useCallback((patch: Partial<BuildingShape>) => {
+    setShape((prev) => ({ ...prev, ...patch }))
+  }, [])
 
   // Смена типа дома сбрасывает форму на типовые значения этого типа.
-  const changeBuildingType = useCallback(
-    (v: BuildingType) => {
-      update({ buildingType: v })
-      setShape(BUILDING_DEFAULTS[v])
-    },
-    [update]
-  )
-
-  // При первой загрузке: если URL пустой — записываем дефолты
-  useEffect(() => {
-    if (searchParams.toString() === "") syncUrl(input)
-    return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  const changeBuildingType = useCallback((v: BuildingType) => {
+    setInput((prev) => ({ ...prev, buildingType: v }))
+    setShape(BUILDING_DEFAULTS[v])
   }, [])
+
+  // URL отражает и сценарий, и форму дома — чтобы ссылка воспроизводила состояние.
+  // Дебаунс 400ms. Пишем в URL только если строка реально изменилась — иначе
+  // повторный router.replace под Suspense-границей зацикливает ре-рендер.
+  useEffect(() => {
+    const params = new URLSearchParams({
+      position: input.position,
+      buildingType: input.buildingType,
+      timeOfDay: input.timeOfDay,
+      severity: input.severity,
+      culturalContext: input.culturalContext,
+      acquaintance: String(input.acquaintance),
+      addressed: String(input.addressed),
+      apf: String(shape.apartmentsPerFloor),
+      floors: String(shape.floors),
+      entrances: String(shape.entrances),
+      scope: shape.witnessScope,
+      ...(shape.neighboringHouses !== undefined
+        ? { houses: String(shape.neighboringHouses) }
+        : {}),
+    })
+    const qs = params.toString()
+    const timer = setTimeout(() => {
+      const current = window.location.search.replace(/^\?/, "")
+      if (qs !== current) {
+        router.replace(`?${qs}`, { scroll: false })
+      }
+    }, 400)
+    return () => clearTimeout(timer)
+  }, [input, shape, router])
+
+  // Раскрытие блока «Уточнить параметры дома» (свёрнут по умолчанию).
+  const [shapeOpen, setShapeOpen] = useState(false)
 
   // Число соседей-свидетелей выводится из формы дома и позиции квартиры.
   const houseN = useMemo(
@@ -280,6 +358,78 @@ export default function Calculator() {
           value={input.position}
           onChange={(v) => update({ position: v })}
         />
+
+        {/* Уточнить параметры дома — свёрнуто по умолчанию */}
+        <div className="rounded-xl border border-slate-200">
+          <button
+            type="button"
+            aria-expanded={shapeOpen}
+            aria-controls="shape-panel"
+            onClick={() => setShapeOpen((v) => !v)}
+            className="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-medium text-slate-700
+              focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-500"
+          >
+            <span>Уточнить параметры дома</span>
+            <span
+              aria-hidden="true"
+              className={`text-slate-400 transition-transform duration-200 ${shapeOpen ? "rotate-90" : ""}`}
+            >
+              ▸
+            </span>
+          </button>
+
+          {shapeOpen && (
+            <div id="shape-panel" className="space-y-4 border-t border-slate-200 px-4 py-4">
+              {input.buildingType === "private" ? (
+                <NumberField
+                  id="shape-houses"
+                  label="Сколько соседних домов рядом"
+                  hint="Сколько соседних домов достаточно близко, чтобы заметить происходящее. Из этого числа складывается N."
+                  value={shape.neighboringHouses ?? 0}
+                  min={0}
+                  onChange={(v) => updateShape({ neighboringHouses: v })}
+                />
+              ) : (
+                <>
+                  <div className="flex flex-wrap gap-4">
+                    <NumberField
+                      id="shape-apf"
+                      label="Квартир на этаже"
+                      hint="Сколько квартир на одной площадке (этаже) в вашем подъезде."
+                      value={shape.apartmentsPerFloor}
+                      min={1}
+                      onChange={(v) => updateShape({ apartmentsPerFloor: v })}
+                    />
+                    <NumberField
+                      id="shape-floors"
+                      label="Этажей"
+                      hint="Сколько этажей в доме."
+                      value={shape.floors}
+                      min={1}
+                      onChange={(v) => updateShape({ floors: v })}
+                    />
+                    <NumberField
+                      id="shape-entrances"
+                      label="Подъездов"
+                      hint="Сколько подъездов в доме. Влияет на N только если считать свидетелями весь дом."
+                      value={shape.entrances}
+                      min={1}
+                      onChange={(v) => updateShape({ entrances: v })}
+                    />
+                  </div>
+                  <RadioGroup
+                    id="witnessScope"
+                    legend="Кого считать свидетелями"
+                    hint="Весь дом — все квартиры. Мой подъезд — только ваш подъезд. Мой этаж и соседи — ваш этаж плюс по одному сверху и снизу. От этого зависит число N."
+                    options={SCOPE_OPTIONS}
+                    value={shape.witnessScope}
+                    onChange={(v) => updateShape({ witnessScope: v })}
+                  />
+                </>
+              )}
+            </div>
+          )}
+        </div>
 
         <RadioGroup
           id="culturalContext"
