@@ -44,8 +44,10 @@ export function getWhyText(input: ScenarioInput): string {
   const c = culturalText[input.culturalContext]
   if (c) parts.push(c)
 
-  // Позиция — добавляем только для угловой
-  if (input.position === "corner") {
+  // Позиция — добавляем только для угловой.
+  // В адресном режиме позицию не упоминаем: ты обращаешься к человеку напрямую,
+  // фактор охвата (слышимость через стены) к адресату не применяется.
+  if (input.position === "corner" && !input.addressed) {
     parts.push("Угловая квартира — меньше общих стен, меньше слышно соседей.")
   }
 

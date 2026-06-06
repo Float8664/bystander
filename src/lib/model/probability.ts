@@ -46,9 +46,13 @@ export function pAtLeastOne(input: ScenarioInput): number {
   if (input.addressed) {
     // Адресный режим: один конкретный адресат почти не подвержен диффузии.
     // p_addressee = p_context (ADDRESSED_DIFFUSION_REMOVAL=1.0 → диффузия снята полностью).
-    // Остальные N−1 соседей — как обычно (с диффузией).
+    // Позиция квартиры (угловая/средняя) — это фактор ОХВАТА/слышимости: сколько
+    // соседей вообще что-то заметят. К адресату он не применяется: ты обращаешься
+    // к нему напрямую, общие стены и слышимость тут ни при чём. Поэтому шанс
+    // адресата считаем с нейтральной позицией ('middle' = 1.0), без охвата.
+    // Остальные N−1 соседей — как обычно (с диффузией и со своей позицией).
     // Формула: 1 − (1 − p_addr) × (1 − p_regular)^(N−1)
-    const pAddr    = clamp(applyModifiers(input) * (
+    const pAddr    = clamp(applyModifiers({ ...input, position: 'middle' }) * (
       ADDRESSED_DIFFUSION_REMOVAL + (1 - ADDRESSED_DIFFUSION_REMOVAL) * diffusion(n)
     ))
     if (n === 1) return pAddr
@@ -62,9 +66,10 @@ export function pAtLeastOne(input: ScenarioInput): number {
 
 /** Главная функция: возвращает ModelResult для заданного сценария */
 export function computeResult(input: ScenarioInput): ModelResult {
-  // В адресном режиме pIndividual = шанс адресата (без диффузии)
+  // В адресном режиме pIndividual = шанс адресата (без диффузии и без фактора
+  // охвата — позиция к адресату не применяется, см. pAtLeastOne).
   const pInd = input.addressed
-    ? clamp(applyModifiers(input))
+    ? clamp(applyModifiers({ ...input, position: 'middle' }))
     : pIndividual(input)
   return {
     pIndividual: pInd,

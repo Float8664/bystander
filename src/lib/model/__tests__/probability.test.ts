@@ -272,4 +272,29 @@ describe('addressed', () => {
       expect(r.pAtLeastOne).toBeLessThanOrEqual(1)
     }
   })
+
+  it('при addressed=true и N=1 позиция (угловая/средняя) НЕ влияет на итог', () => {
+    // Адресат один, фактор охвата к нему не применяется — corner и middle совпадают.
+    const corner = computeResult({ ...withAddr, neighbors: 1, position: 'corner' })
+    const middle = computeResult({ ...withAddr, neighbors: 1, position: 'middle' })
+    expect(corner.pAtLeastOne).toBeCloseTo(middle.pAtLeastOne, 10)
+    expect(corner.pIndividual).toBeCloseTo(middle.pIndividual, 10)
+  })
+
+  it('при addressed=true позиция влияет лишь слабо (остаётся через N−1 соседей)', () => {
+    // При N>1 позиция всё ещё влияет на N−1 обычных соседей, но вклад адресата
+    // доминирует — итог меняется незначительно (в отличие от неадресного режима).
+    const n = 10
+    const corner = computeResult({ ...withAddr, neighbors: n, position: 'corner' }).pAtLeastOne
+    const middle = computeResult({ ...withAddr, neighbors: n, position: 'middle' }).pAtLeastOne
+    expect(Math.abs(corner - middle)).toBeLessThan(0.05)
+  })
+
+  it('в неадресном режиме позиция, наоборот, влияет заметно (контроль)', () => {
+    // Подтверждаем, что фактор охвата вообще работает — просто к адресату он не идёт.
+    const n = 10
+    const corner = computeResult({ ...withoutAddr, neighbors: n, position: 'corner' }).pAtLeastOne
+    const middle = computeResult({ ...withoutAddr, neighbors: n, position: 'middle' }).pAtLeastOne
+    expect(middle).toBeGreaterThan(corner)
+  })
 })
