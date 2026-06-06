@@ -303,6 +303,18 @@ export default function Calculator() {
   const pInd = (result.pIndividual * 100).toFixed(1)
   const pAny = (result.pAtLeastOne * 100).toFixed(1)
 
+  // Ползунок-исследование «а что если соседей было бы больше/меньше».
+  // experimentN === null, пока слайдер не трогали — на графике только точка «ваш дом».
+  const [experimentOpen, setExperimentOpen] = useState(false)
+  const [experimentN, setExperimentN] = useState<number | null>(null)
+  const experimentMax = Math.max(50, Math.ceil(houseN * 2))
+
+  // Смена дома (а с ней houseN) сбрасывает эксперимент — чтобы не сравнивать
+  // с устаревшей точкой и не выходить за новую ось графика.
+  useEffect(() => {
+    setExperimentN(null)
+  }, [houseN])
+
   return (
     <section aria-label="Калькулятор эффекта свидетеля" className="w-full max-w-2xl mx-auto space-y-8">
 
@@ -538,8 +550,70 @@ export default function Calculator() {
         </p>
       </div>
 
+      {/* Ползунок-исследование «а что если» — свёрнут по умолчанию */}
+      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <button
+          type="button"
+          aria-expanded={experimentOpen}
+          aria-controls="experiment-panel"
+          onClick={() => setExperimentOpen((v) => !v)}
+          className="flex w-full items-center justify-between text-left text-sm font-medium text-slate-700
+            focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-500"
+        >
+          <span>А что если соседей было бы больше или меньше?</span>
+          <span
+            aria-hidden="true"
+            className={`text-slate-400 transition-transform duration-200 ${experimentOpen ? "rotate-90" : ""}`}
+          >
+            ▸
+          </span>
+        </button>
+
+        {experimentOpen && (
+          <div id="experiment-panel" className="mt-4 space-y-3">
+            <p className="text-sm text-slate-500 italic">
+              Как думаешь: чем больше соседей, тем выше шанс на помощь — или нет?
+              Подвигай ползунок и сравни с точкой «ваш дом».
+            </p>
+            <label htmlFor="experiment-slider" className="text-sm font-medium text-slate-700">
+              Соседей в эксперименте:{" "}
+              <span className="font-bold text-amber-600" aria-live="polite">
+                {experimentN ?? houseN}
+              </span>
+            </label>
+            <input
+              id="experiment-slider"
+              type="range"
+              min={1}
+              max={experimentMax}
+              step={1}
+              value={experimentN ?? houseN}
+              onChange={(e) => setExperimentN(Number(e.target.value))}
+              aria-label="Число соседей в эксперименте"
+              aria-valuemin={1}
+              aria-valuemax={experimentMax}
+              aria-valuenow={experimentN ?? houseN}
+              className="w-full h-2 rounded-full appearance-none cursor-pointer bg-slate-200 accent-amber-600"
+            />
+            <div className="flex justify-between text-xs text-slate-400">
+              <span>1</span>
+              <span>{experimentMax}</span>
+            </div>
+            {experimentN !== null && experimentN !== houseN && (
+              <button
+                type="button"
+                onClick={() => setExperimentN(null)}
+                className="text-xs text-slate-500 underline underline-offset-2 hover:text-slate-700"
+              >
+                Вернуться к вашему дому ({houseN})
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
       {/* График */}
-      <BystanderChart input={modelInput} houseN={houseN} />
+      <BystanderChart input={modelInput} houseN={houseN} experimentN={experimentN} />
 
       {/* Пояснение */}
       <Explanation />

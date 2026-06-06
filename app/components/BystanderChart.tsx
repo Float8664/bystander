@@ -28,10 +28,19 @@ function niceAxisMax(n: number): number {
 interface Props {
   input: ScenarioInput
   houseN: number
+  experimentN: number | null
 }
 
-export default function BystanderChart({ input, houseN }: Props) {
-  const axisMax = useMemo(() => niceAxisMax(houseN), [houseN])
+export default function BystanderChart({ input, houseN, experimentN }: Props) {
+  // Ось должна вмещать и дом, и точку эксперимента (если она дальше дома).
+  const axisMax = useMemo(
+    () => niceAxisMax(Math.max(houseN, experimentN ?? 0)),
+    [houseN, experimentN]
+  )
+
+  // Точку эксперимента показываем, только если слайдер трогали и она не совпала
+  // с домом — иначе две точки сольются и запутают.
+  const showExperiment = experimentN !== null && experimentN !== houseN
 
   // Кривые строятся через функции модели — формул в компоненте нет.
   // При больших axisMax берём не каждое N, а ~80 точек, чтобы не считать тысячи раз.
@@ -63,10 +72,21 @@ export default function BystanderChart({ input, houseN }: Props) {
     [input, houseN]
   )
 
+  const experimentY = useMemo(
+    () =>
+      experimentN !== null
+        ? pct(computeResult({ ...input, neighbors: experimentN }).pAtLeastOne)
+        : null,
+    [input, experimentN]
+  )
+
   return (
     <div
       role="img"
-      aria-label={`График: в вашем доме примерно ${houseN} соседей, реальный шанс помощи ${houseY}%.`}
+      aria-label={
+        `График: в вашем доме примерно ${houseN} соседей, реальный шанс помощи ${houseY}%.` +
+        (showExperiment ? ` В эксперименте ${experimentN} соседей — шанс ${experimentY}%.` : "")
+      }
       className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
     >
       <h2 className="text-base font-semibold text-slate-800 mb-1">
@@ -88,6 +108,12 @@ export default function BystanderChart({ input, houseN }: Props) {
           <span className="inline-block w-2.5 h-2.5 rounded-full bg-blue-600 border-2 border-white shadow" />
           Ваш дом
         </span>
+        {showExperiment && (
+          <span className="flex items-center gap-1.5 text-amber-600 font-medium">
+            <span className="inline-block w-2.5 h-2.5 rounded-full bg-amber-600 border-2 border-white shadow" />
+            Эксперимент
+          </span>
+        )}
       </div>
 
       <ResponsiveContainer width="100%" height={280}>
@@ -163,6 +189,25 @@ export default function BystanderChart({ input, houseN }: Props) {
                 fontSize: 12,
                 fontWeight: 600,
                 fill: "#2563eb",
+              }}
+            />
+          )}
+
+          {/* Точка «эксперимент» — янтарная, отдельно от «ваш дом» */}
+          {showExperiment && experimentN !== null && experimentY !== null && (
+            <ReferenceDot
+              x={experimentN}
+              y={experimentY}
+              r={6}
+              fill="#d97706"
+              stroke="white"
+              strokeWidth={2}
+              label={{
+                value: `эксперимент — ${experimentY}%`,
+                position: experimentN > axisMax * 0.6 ? "left" : "right",
+                fontSize: 12,
+                fontWeight: 600,
+                fill: "#d97706",
               }}
             />
           )}
