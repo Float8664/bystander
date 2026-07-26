@@ -13,9 +13,11 @@ import { getGuessDelta, getGuessReaction } from "./guessReaction"
 import {
   getGuessServerSnapshot,
   getGuessSnapshot,
+  markRevealed,
   storeGuess,
   subscribeToGuess,
 } from "./guessStore"
+import StepLabel from "./StepLabel"
 import type {
   BuildingShape,
   BuildingType,
@@ -356,26 +358,67 @@ export default function Calculator() {
   // компонент рендерится и на сервере, где sessionStorage нет, и чтение
   // в инициализаторе useState давало null навсегда — вернувшийся пользователь
   // снова видел вопрос, хотя догадка была сохранена.
-  const guess = useSyncExternalStore(
+  const { guess, revealed } = useSyncExternalStore(
     subscribeToGuess,
     getGuessSnapshot,
     getGuessServerSnapshot
   )
   const [editingGuess, setEditingGuess] = useState(false)
 
-  const commitGuess = useCallback((v: number) => {
-    storeGuess(v)
-    setEditingGuess(false)
-  }, [])
+  // Догадка поставлена и сейчас не переигрывается.
+  const hasGuess = guess !== null && !editingGuess
+  // Шаг 3 показываем после того, как результат раскрыли хотя бы раз.
+  const showResults = hasGuess && revealed
 
-  // Показываем результат только когда догадка зафиксирована и не редактируется.
-  const showResults = guess !== null && !editingGuess
-
-  // Якорь на блок догадки — из заглушки внизу и при переходе к «изменить догадку».
+  // ─── Якоря и прокрутки ───────────────────────────────────────────────────
   const guessRef = useRef<HTMLDivElement>(null)
-  const scrollToGuess = useCallback(() => {
-    guessRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+  const houseRef = useRef<HTMLDivElement>(null)
+  const resultRef = useRef<HTMLDivElement>(null)
+
+  // Прокручиваем после отрисовки: при смене шага блоки появляются и исчезают,
+  // высота страницы меняется, и прокрутка «сразу» уехала бы мимо цели.
+  const scrollAfterPaint = useCallback((el: HTMLElement | null) => {
+    if (!el) return
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        el.scrollIntoView({ behavior: "smooth", block: "start" })
+      })
+    })
   }, [])
+
+  const scrollToGuess = useCallback(
+    () => scrollAfterPaint(guessRef.current),
+    [scrollAfterPaint]
+  )
+
+  // Раскрытие результата инициируется только кликом. Флаг-намерение нужен,
+  // потому что revealed приходит из внешнего хранилища: при перезагрузке
+  // страницы он тоже становится true, но прокручивать тогда не надо.
+  const wantScrollToResult = useRef(false)
+
+  const commitGuess = useCallback(
+    (v: number) => {
+      const firstPass = !revealed
+      storeGuess(v)
+      setEditingGuess(false)
+      // Первый проход — ведём к шагу 2, чтобы человек не остался в тишине.
+      // В свободном режиме никаких принудительных прокруток.
+      if (firstPass) scrollAfterPaint(houseRef.current)
+    },
+    [revealed, scrollAfterPaint]
+  )
+
+  const revealResult = useCallback(() => {
+    wantScrollToResult.current = true
+    markRevealed()
+  }, [])
+
+  useEffect(() => {
+    if (wantScrollToResult.current && showResults) {
+      wantScrollToResult.current = false
+      scrollAfterPaint(resultRef.current)
+    }
+  }, [showResults, scrollAfterPaint])
 
   // «Изменить догадку» открывает блок наверху — сам по себе он остался бы
   // за экраном, поэтому прокручиваем к нему после появления.
@@ -389,7 +432,7 @@ export default function Calculator() {
       {/* Догадка — первое на экране, пока не зафиксирована. Стоит ВЫШЕ формы
           намеренно: снизу её не замечали и страница читалась как статичная.
           Параметры дома остаются доступными ниже — их можно менять и после. */}
-      {!showResults && (
+      {!hasGuess && (
         <div ref={guessRef} className="scroll-mt-6">
           <GuessPrompt
             initialValue={guess}
@@ -399,8 +442,17 @@ export default function Calculator() {
         </div>
       )}
 
-      {/* Форма ввода */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-6">
+      {/* ─── Шаг 2: твой дом ─── */}
+      <div ref={houseRef} className="scroll-mt-6 space-y-3">
+        <div className="space-y-1">
+          <StepLabel>Шаг 2 — твой дом</StepLabel>
+          <p className="text-sm text-slate-600">
+            Теперь опиши свой дом — от этого зависит число соседей и расчёт.
+          </p>
+        </div>
+
+        {/* Форма ввода */}
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-6">
 
         <RadioGroup
           id="severity"
@@ -583,11 +635,41 @@ export default function Calculator() {
             />
           </button>
         </div>
+
+        {/* Завершение шага 2. Пока результат не раскрыт — акцентная кнопка:
+            это единственный «выход» из шага. После первого раза она больше
+            не ведёт, а остаётся тихой ссылкой-навигацией по длинной странице. */}
+        {hasGuess && !revealed && (
+          <div className="border-t border-slate-200 pt-5">
+            <button
+              type="button"
+              onClick={revealResult}
+              className="w-full sm:w-auto rounded-xl bg-slate-900 px-6 py-3 text-base font-semibold text-white
+                shadow-sm transition-colors hover:bg-slate-700
+                focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
+            >
+              Сравнить с моей догадкой
+            </button>
+          </div>
+        )}
+        {showResults && (
+          <div className="border-t border-slate-200 pt-4">
+            <button
+              type="button"
+              onClick={() => scrollAfterPaint(resultRef.current)}
+              className="text-sm text-slate-500 underline underline-offset-2 hover:text-slate-700
+                focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-500"
+            >
+              Перейти к результату ↓
+            </button>
+          </div>
+        )}
+        </div>
       </div>
 
       {/* Заглушка на месте результата и графика: доскроллив до пустоты,
           человек понимает причину и знает, куда вернуться. */}
-      {!showResults && (
+      {!hasGuess && (
         <div className="rounded-2xl border-2 border-dashed border-slate-300 bg-white/50 p-8 text-center">
           <p className="text-sm text-slate-500 leading-relaxed">
             Результат и график появятся, когда ты зафиксируешь догадку{" "}
@@ -606,6 +688,10 @@ export default function Calculator() {
 
       {showResults && guess !== null && (
         <>
+          {/* ─── Шаг 3: сравнение ─── */}
+          <div ref={resultRef} className="scroll-mt-6 space-y-3">
+            <StepLabel>Шаг 3 — сравнение</StepLabel>
+
           {/* Результат */}
           <div
             role="region"
@@ -676,6 +762,7 @@ export default function Calculator() {
                 Не является эмпирически валидированным прогнозом.
               </p>
             </div>
+          </div>
           </div>
 
       {/* Ползунок-исследование «а что если» — свёрнут по умолчанию */}

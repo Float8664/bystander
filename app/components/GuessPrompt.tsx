@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import StepLabel from "./StepLabel"
 
 /**
  * Фиксация догадки пользователя до показа результата.
@@ -27,9 +28,7 @@ export default function GuessPrompt({
   return (
     <div className="rounded-2xl border-2 border-slate-900 bg-white p-6 sm:p-8 shadow-lg space-y-5">
       <div className="space-y-2">
-        <p className="text-xs font-semibold uppercase tracking-widest text-emerald-600">
-          Шаг 1 — твоя догадка
-        </p>
+        <StepLabel>Шаг 1 — твоя догадка</StepLabel>
         <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 leading-tight">
           Сначала предположи
         </h2>
