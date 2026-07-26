@@ -36,6 +36,53 @@ export default function Home() {
           </a>
         </div>
 
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 space-y-5 text-sm text-slate-600 leading-relaxed">
+          <div className="space-y-1.5">
+            <p className="font-medium text-slate-700">Если слышишь у соседей что-то похожее на насилие</p>
+            <ul className="list-disc list-inside space-y-1">
+              <li>
+                Звони{" "}
+                <a href="tel:112" className="font-medium text-slate-800 underline underline-offset-2 hover:text-slate-900">
+                  112
+                </a>{" "}
+                — единый экстренный номер.
+              </li>
+              <li>Если это безопасно — можно записать происходящее на телефон.</li>
+              <li>Не оставайся молчаливым свидетелем.</li>
+            </ul>
+          </div>
+
+          <div className="space-y-1.5 border-t border-slate-100 pt-5">
+            <p className="font-medium text-slate-700">Если помощь нужна тебе или близкому</p>
+            <ul className="list-disc list-inside space-y-1">
+              <li>
+                <a href="tel:112" className="font-medium text-slate-800 underline underline-offset-2 hover:text-slate-900">
+                  112
+                </a>{" "}
+                — экстренная помощь, круглосуточно.
+              </li>
+              <li>
+                <a href="tel:88007000600" className="font-medium text-slate-800 underline underline-offset-2 hover:text-slate-900">
+                  8&nbsp;800&nbsp;7000&nbsp;600
+                </a>{" "}
+                — телефон доверия для пострадавших от насилия, круглосуточно.
+              </li>
+              <li>
+                Раздел помощи на портале{" "}
+                <a
+                  href="https://www.gosuslugi.ru/domestic_abuse"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline underline-offset-2 text-slate-700 hover:text-slate-900"
+                >
+                  Госуслуги
+                </a>{" "}
+                — актуальные горячие линии и карта кризисных центров.
+              </li>
+            </ul>
+          </div>
+        </div>
+
         <footer className="text-center text-xs text-slate-300">
           Только для образовательных целей · не является эмпирически валидированным прогнозом
         </footer>
