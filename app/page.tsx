@@ -65,7 +65,7 @@ export default function Home() {
                 <a href="tel:88007000600" className="font-medium text-slate-800 underline underline-offset-2 hover:text-slate-900">
                   8&nbsp;800&nbsp;7000&nbsp;600
                 </a>{" "}
-                — телефон доверия для пострадавших от насилия, круглосуточно.
+                — телефон доверия для пострадавших от насилия, с 7:00 до 21:00 по московскому времени.
               </li>
               <li>
                 Раздел помощи на портале{" "}
