@@ -9,9 +9,10 @@ import {
   CartesianGrid,
   Tooltip,
   ReferenceDot,
+  ReferenceLine,
   ResponsiveContainer,
 } from "recharts"
-import { computeResult, computeNaive } from "@/src/lib/model/probability"
+import { computeResult } from "@/src/lib/model/probability"
 import type { ScenarioInput } from "@/src/lib/model/types"
 
 const pct = (v: number) => Math.round(v * 1000) / 10
@@ -29,9 +30,11 @@ interface Props {
   input: ScenarioInput
   houseN: number
   experimentN: number | null
+  /** Догадка пользователя в процентах — рисуется горизонтальным маркером. */
+  guess: number
 }
 
-export default function BystanderChart({ input, houseN, experimentN }: Props) {
+export default function BystanderChart({ input, houseN, experimentN, guess }: Props) {
   // Ось должна вмещать и дом, и точку эксперимента (если она дальше дома).
   const axisMax = useMemo(
     () => niceAxisMax(Math.max(houseN, experimentN ?? 0)),
@@ -52,7 +55,6 @@ export default function BystanderChart({ input, houseN, experimentN }: Props) {
     return xs.map((n) => ({
       n,
       real: pct(computeResult({ ...input, neighbors: n }).pAtLeastOne),
-      naive: pct(computeNaive({ ...input, neighbors: n }).pAtLeastOne),
     }))
   }, [
     axisMax,
@@ -84,7 +86,8 @@ export default function BystanderChart({ input, houseN, experimentN }: Props) {
     <div
       role="img"
       aria-label={
-        `График: в вашем доме примерно ${houseN} соседей, реальный шанс помощи ${houseY}%.` +
+        `График: ты предположил ${guess}%. ` +
+        `В вашем доме примерно ${houseN} соседей, расчётный шанс помощи ${houseY}%.` +
         (showExperiment ? ` В эксперименте ${experimentN} соседей — шанс ${experimentY}%.` : "")
       }
       className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
@@ -92,17 +95,17 @@ export default function BystanderChart({ input, houseN, experimentN }: Props) {
       <h2 className="text-base font-semibold text-slate-800 mb-1">
         Помогут ли соседи — и как это зависит от их числа
       </h2>
-      <p className="text-xs text-slate-400 mb-4">Меняй параметры выше — кривые обновятся</p>
+      <p className="text-xs text-slate-400 mb-4">Меняй параметры выше — кривая обновится</p>
 
-      {/* Легенда-подписи линий — HTML, не на графике */}
+      {/* Легенда-подписи — HTML, не на графике */}
       <div className="flex flex-wrap gap-x-5 gap-y-2 mb-4 text-xs">
         <span className="flex items-center gap-1.5 text-slate-800 font-medium">
           <span className="inline-block w-6 h-0.5 bg-slate-800 rounded" />
           На самом деле
         </span>
-        <span className="flex items-center gap-1.5 text-slate-400">
-          <span className="inline-block w-6 border-t-2 border-dashed border-slate-400" />
-          Как нам кажется
+        <span className="flex items-center gap-1.5 text-emerald-600 font-medium">
+          <span className="inline-block w-6 border-t-2 border-dashed border-emerald-500" />
+          Твоя догадка
         </span>
         <span className="flex items-center gap-1.5 text-blue-600 font-medium">
           <span className="inline-block w-2.5 h-2.5 rounded-full bg-blue-600 border-2 border-white shadow" />
@@ -141,25 +144,26 @@ export default function BystanderChart({ input, houseN, experimentN }: Props) {
             width={56}
           />
           <Tooltip
-            formatter={(value, name) => [
+            formatter={(value) => [
               typeof value === "number" ? `${value}%` : "—",
-              name === "real" ? "На самом деле" : "Как нам кажется",
+              "На самом деле",
             ]}
             labelFormatter={(n) => `Соседей: ${n}`}
             contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #e2e8f0" }}
           />
 
-          {/* Пунктирная — «как нам кажется» */}
-          <Line
-            type="monotone"
-            dataKey="naive"
-            stroke="#94a3b8"
-            strokeWidth={2}
-            strokeDasharray="6 3"
-            dot={false}
-            activeDot={{ r: 3, fill: "#94a3b8" }}
-            isAnimationActive={true}
-            animationDuration={500}
+          {/* Горизонтальный маркер догадки — видно, насколько кривая ниже ожидания */}
+          <ReferenceLine
+            y={guess}
+            stroke="#10b981"
+            strokeWidth={1.5}
+            strokeDasharray="6 4"
+            label={{
+              value: `твоя догадка — ${guess}%`,
+              position: "insideTopLeft",
+              fontSize: 11,
+              fill: "#059669",
+            }}
           />
 
           {/* Сплошная — «на самом деле» */}

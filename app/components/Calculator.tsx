@@ -6,8 +6,10 @@ import { computeResult, computeWitnessCount } from "@/src/lib/model/probability"
 import { BUILDING_DEFAULTS } from "@/src/lib/model/constants"
 import BystanderChart from "./BystanderChart"
 import Explanation from "./Explanation"
+import GuessPrompt from "./GuessPrompt"
 import Hint from "./Hint"
 import { getWhyText } from "./whyText"
+import { getGuessDelta, getGuessReaction } from "./guessReaction"
 import type {
   BuildingShape,
   BuildingType,
@@ -242,6 +244,24 @@ function pluralApartments(n: number): string {
   return "квартир"
 }
 
+// Ключ sessionStorage для догадки. Догадка намеренно не хранится в URL:
+// ссылка должна передавать сценарий, но не чужое предположение.
+const GUESS_KEY = "bystander:guess"
+
+// Читает сохранённую догадку. Возвращает null, если её нет, она испорчена
+// или хранилище недоступно (приватный режим) — тогда просто спросим заново.
+function readStoredGuess(): number | null {
+  if (typeof window === "undefined") return null
+  try {
+    const raw = sessionStorage.getItem(GUESS_KEY)
+    if (raw === null) return null
+    const v = Number(raw)
+    return Number.isFinite(v) && v >= 0 && v <= 100 ? Math.round(v) : null
+  } catch {
+    return null
+  }
+}
+
 // ─── Основной компонент ──────────────────────────────────────────────────────
 
 export default function Calculator() {
@@ -335,6 +355,29 @@ export default function Calculator() {
   useEffect(() => {
     setExperimentN(null)
   }, [houseN])
+
+  // ─── Догадка пользователя ────────────────────────────────────────────────
+  // Живёт в sessionStorage: переживает перезагрузку вкладки, но НЕ попадает
+  // в URL — иначе получатель ссылки увидел бы чужую догадку вместо своей.
+  // Читаем прямо в инициализаторе useState, а не в эффекте: этот компонент
+  // использует useSearchParams, из-за чего всё поддерево рендерится только
+  // на клиенте (на сервере отдаётся Suspense-заглушка). Рассинхрона при
+  // гидратации быть не может, а лишнего каскадного ре-рендера — тоже.
+  const [guess, setGuess] = useState<number | null>(readStoredGuess)
+  const [editingGuess, setEditingGuess] = useState(false)
+
+  const commitGuess = useCallback((v: number) => {
+    setGuess(v)
+    setEditingGuess(false)
+    try {
+      sessionStorage.setItem(GUESS_KEY, String(v))
+    } catch {
+      // Не смогли сохранить — догадка всё равно живёт в состоянии до перезагрузки.
+    }
+  }, [])
+
+  // Показываем результат только когда догадка зафиксирована и не редактируется.
+  const showResults = guess !== null && !editingGuess
 
   return (
     <section aria-label="Калькулятор эффекта свидетеля" className="w-full max-w-2xl mx-auto space-y-8">
@@ -525,51 +568,89 @@ export default function Calculator() {
         </div>
       </div>
 
-      {/* Результат */}
-      <div
-        role="region"
-        aria-label="Результат расчёта"
-        aria-live="polite"
-        className="rounded-2xl border border-slate-200 bg-slate-50 p-6 shadow-sm"
-      >
-        <h2 className="text-sm font-medium uppercase tracking-widest text-slate-400 mb-4">
-          Иллюстративный результат
-        </h2>
-        {/* Главная цифра — итог */}
-        <div className="space-y-1">
-          <p className="text-xs text-slate-500">
-            Шанс, что поможет хоть кто-то
-          </p>
-          <p className="text-5xl font-bold text-slate-900" aria-live="polite">{pAny}%</p>
-        </div>
+      {/* Догадка ещё не зафиксирована (или пользователь её меняет) — вместо
+          результата, эксперимента и графика показываем вопрос. */}
+      {!showResults && (
+        <GuessPrompt
+          initialValue={guess}
+          onCommit={commitGuess}
+          onCancel={guess !== null ? () => setEditingGuess(false) : undefined}
+        />
+      )}
 
-        {/* Фраза-мостик: связывает обе цифры в одну мысль */}
-        <p className="mt-4 text-sm text-slate-600 leading-relaxed" aria-live="polite">
-          Каждый сосед сам по себе среагирует лишь с шансом{" "}
-          <span className="font-semibold text-slate-800">{pInd}%</span> —
-          каждый надеется, что это сделает кто-то другой.
-          Но соседей{" "}
-          <span className="font-semibold text-slate-800">{houseN}</span>,
-          поэтому шанс, что среагирует хоть кто-нибудь, —{" "}
-          <span className="font-semibold text-slate-800">{pAny}%</span>.
-        </p>
+      {showResults && guess !== null && (
+        <>
+          {/* Результат */}
+          <div
+            role="region"
+            aria-label="Результат расчёта"
+            aria-live="polite"
+            className="rounded-2xl border border-slate-200 bg-slate-50 p-6 shadow-sm"
+          >
+            <h2 className="text-xs font-medium uppercase tracking-widest text-slate-400 mb-4">
+              Иллюстративный результат
+            </h2>
 
-        {/* Вспомогательная цифра — объяснение */}
-        <div className="mt-3 space-y-0.5">
-          <p className="text-xs text-slate-400">Шанс одного конкретного соседа</p>
-          <p className="text-xl font-semibold text-slate-400">{pInd}%</p>
-        </div>
+            {/* Главный контраст: догадка против расчёта — первое, что видит глаз */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <p className="text-xs text-slate-500">Ты предположил</p>
+                <p className="text-3xl sm:text-4xl font-bold text-slate-400 tabular-nums">
+                  {guess}%
+                </p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs text-slate-500">На самом деле</p>
+                <p className="text-3xl sm:text-4xl font-bold text-slate-900 tabular-nums">
+                  {pAny}%
+                </p>
+              </div>
+            </div>
 
-        {/* Динамическое объяснение текущего выбора */}
-        <p className="mt-3 text-sm text-slate-500 leading-relaxed" aria-live="polite">
-          {getWhyText(modelInput)}
-        </p>
-        <p className="mt-3 text-xs text-slate-400 leading-relaxed">
-          Значения иллюстративны. Формула: P = 1 − (1 − p<sub>инд</sub>)<sup>N</sup>,
-          где p<sub>инд</sub> убывает с ростом N (диффузия ответственности по Darley &amp; Latané, 1968).
-          Не является эмпирически валидированным прогнозом.
-        </p>
-      </div>
+            {/* Живая реакция на величину промаха */}
+            <p className="mt-4 text-base text-slate-700 leading-relaxed">
+              {getGuessReaction(guess, Number(pAny))}
+            </p>
+            <p className="mt-1 text-xs text-slate-400">
+              Твоя догадка {getGuessDelta(guess, Number(pAny))}.{" "}
+              <button
+                type="button"
+                onClick={() => setEditingGuess(true)}
+                className="underline underline-offset-2 hover:text-slate-600
+                  focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-500"
+              >
+                Изменить догадку
+              </button>
+            </p>
+
+            {/* Ниже и спокойнее — разбор, откуда взялась цифра */}
+            <div className="mt-6 border-t border-slate-200 pt-4 space-y-3">
+              <p className="text-sm text-slate-600 leading-relaxed" aria-live="polite">
+                Каждый сосед сам по себе среагирует лишь с шансом{" "}
+                <span className="font-semibold text-slate-800">{pInd}%</span> —
+                каждый надеется, что это сделает кто-то другой.
+                Но соседей{" "}
+                <span className="font-semibold text-slate-800">{houseN}</span>,
+                поэтому шанс, что среагирует хоть кто-нибудь, —{" "}
+                <span className="font-semibold text-slate-800">{pAny}%</span>.
+              </p>
+
+              <div className="space-y-0.5">
+                <p className="text-xs text-slate-400">Шанс одного конкретного соседа</p>
+                <p className="text-lg font-semibold text-slate-400 tabular-nums">{pInd}%</p>
+              </div>
+
+              <p className="text-sm text-slate-500 leading-relaxed" aria-live="polite">
+                {getWhyText(modelInput)}
+              </p>
+
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Значения иллюстративны. Формула: P = 1 − (1 − p<sub>инд</sub>)<sup>N</sup>,
+                где p<sub>инд</sub> убывает с ростом N (диффузия ответственности по Darley &amp; Latané, 1968).
+                Не является эмпирически валидированным прогнозом.
+              </p>
+            </div>
+          </div>
 
       {/* Ползунок-исследование «а что если» — свёрнут по умолчанию */}
       <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -592,8 +673,7 @@ export default function Calculator() {
 
         {experimentOpen && (
           <div id="experiment-panel" className="mt-4 space-y-3">
-            <p className="text-sm text-slate-500 italic">
-              Как думаешь: чем больше соседей, тем выше шанс на помощь — или нет?
+            <p className="text-sm text-slate-500">
               Подвигай ползунок и сравни с точкой «ваш дом».
             </p>
             <label htmlFor="experiment-slider" className="text-sm font-medium text-slate-700">
@@ -634,10 +714,18 @@ export default function Calculator() {
       </div>
 
       {/* График */}
-      <BystanderChart input={modelInput} houseN={houseN} experimentN={experimentN} />
+          <BystanderChart
+            input={modelInput}
+            houseN={houseN}
+            experimentN={experimentN}
+            guess={guess}
+          />
 
-      {/* Пояснение */}
-      <Explanation />
+          {/* Пояснение — тоже под воротами: оно раскрывает развязку
+              («шанс падает, а не растёт») и до догадки было бы спойлером. */}
+          <Explanation />
+        </>
+      )}
 
     </section>
   )
