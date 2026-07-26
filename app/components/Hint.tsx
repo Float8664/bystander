@@ -52,7 +52,7 @@ export default function Hint({ text }: HintProps) {
   }, [open])
 
   return (
-    <span ref={wrapperRef} className="relative inline-block align-middle ml-1">
+    <span ref={wrapperRef} className="relative inline-block shrink-0 align-middle ml-1">
       <button
         type="button"
         aria-label={`Подсказка: ${text}`}
@@ -60,7 +60,7 @@ export default function Hint({ text }: HintProps) {
         onClick={() => setOpen((v) => !v)}
         className={`
           inline-flex items-center justify-center
-          w-4 h-4 rounded-full border
+          w-4 h-4 shrink-0 rounded-full border
           text-[10px] font-bold
           cursor-pointer select-none
           transition-colors

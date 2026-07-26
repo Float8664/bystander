@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { computeResult, computeWitnessCount } from "@/src/lib/model/probability"
 import { BUILDING_DEFAULTS } from "@/src/lib/model/constants"
@@ -136,7 +136,7 @@ function RadioGroup<T extends string>({
 }) {
   return (
     <fieldset className="space-y-1">
-      <legend className="text-sm font-medium text-slate-700">
+      <legend className="flex items-center text-sm font-medium text-slate-700">
         {legend}
         {hint && <Hint text={hint} />}
       </legend>
@@ -173,6 +173,8 @@ function RadioGroup<T extends string>({
 }
 
 // ─── Подкомпонент: числовое поле с подсказкой ───────────────────────────────
+// Локальный строковый стейт позволяет полю быть временно пустым во время ввода.
+// Валидация и коллбэк вызываются только при потере фокуса (onBlur).
 
 function NumberField({
   id,
@@ -189,6 +191,22 @@ function NumberField({
   min?: number
   onChange: (v: number) => void
 }) {
+  const [localValue, setLocalValue] = useState(String(value))
+  const focused = useRef(false)
+
+  // Синхронизируем локальный стейт с внешним значением (например, при сбросе URL),
+  // но только когда поле не в фокусе — иначе прервём ввод пользователя.
+  useEffect(() => {
+    if (!focused.current) setLocalValue(String(value))
+  }, [value])
+
+  function commit(raw: string) {
+    const parsed = Math.floor(Number(raw))
+    const valid = Number.isFinite(parsed) && parsed >= min ? parsed : min
+    setLocalValue(String(valid))
+    if (valid !== value) onChange(valid)
+  }
+
   return (
     <div className="space-y-1">
       <label htmlFor={id} className="text-sm font-medium text-slate-700 flex items-center">
@@ -200,10 +218,12 @@ function NumberField({
         type="number"
         inputMode="numeric"
         min={min}
-        value={value}
-        onChange={(e) => {
-          const v = e.target.valueAsNumber
-          onChange(Number.isNaN(v) ? min : Math.max(min, Math.floor(v)))
+        value={localValue}
+        onChange={(e) => setLocalValue(e.target.value)}
+        onFocus={() => { focused.current = true }}
+        onBlur={(e) => {
+          focused.current = false
+          commit(e.target.value)
         }}
         className="w-24 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-800
           focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-500"
@@ -212,13 +232,14 @@ function NumberField({
   )
 }
 
-// Склонение «сосед-свидетель» по числу (форматирование текста, не модель).
-function pluralNeighbors(n: number): string {
+// Склонение «квартира» по числу (форматирование текста, не модель).
+// Модель считает именно квартиры, а не людей, — текст должен это отражать.
+function pluralApartments(n: number): string {
   const mod10 = n % 10
   const mod100 = n % 100
-  if (mod10 === 1 && mod100 !== 11) return "сосед-свидетель"
-  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return "соседа-свидетеля"
-  return "соседей-свидетелей"
+  if (mod10 === 1 && mod100 !== 11) return "квартира"
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return "квартиры"
+  return "квартир"
 }
 
 // ─── Основной компонент ──────────────────────────────────────────────────────
@@ -321,21 +342,6 @@ export default function Calculator() {
       {/* Форма ввода */}
       <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-6">
 
-        {/* Вычисленное число свидетелей — всегда на виду */}
-        <div
-          className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3"
-          aria-live="polite"
-        >
-          <p className="text-sm text-slate-600">
-            В таком доме —{" "}
-            <span className="font-bold text-slate-900">примерно {houseN}</span>{" "}
-            {pluralNeighbors(houseN)}.
-          </p>
-          <p className="mt-1 text-xs text-slate-400">
-            Число считается из параметров дома — настрой их ниже.
-          </p>
-        </div>
-
         <RadioGroup
           id="severity"
           legend="Серьёзность ситуации"
@@ -356,7 +362,7 @@ export default function Calculator() {
         <RadioGroup
           id="buildingType"
           legend="Тип дома"
-          hint="Хрущёвка — тонкие стены, хорошо слышно. Панельный — средняя слышимость, соседи почти незнакомы. Элитный ЖК — толстые стены, высокая анонимность. Частный дом — соседи знают друг друга."
+          hint="Хрущёвка — тонкие стены, хорошо слышно. Панельный — средняя слышимость, соседи чаще всего незнакомы. Элитный ЖК — толстые стены, выше анонимность. Частный дом — соседи чаще знают друг друга."
           options={BUILDING_OPTIONS}
           value={input.buildingType}
           onChange={changeBuildingType}
@@ -443,6 +449,21 @@ export default function Calculator() {
           )}
         </div>
 
+        {/* Вычисленное число свидетелей — под параметрами дома, из которых оно считается */}
+        <div
+          className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3"
+          aria-live="polite"
+        >
+          <p className="text-sm text-slate-600">
+            В таком доме —{" "}
+            <span className="font-bold text-slate-900">примерно {houseN}</span>{" "}
+            {pluralApartments(houseN)}.
+          </p>
+          <p className="mt-1 text-xs text-slate-400">
+            Число считается из параметров дома — настрой их выше.
+          </p>
+        </div>
+
         <RadioGroup
           id="culturalContext"
           legend="Культурный контекст"
@@ -455,13 +476,13 @@ export default function Calculator() {
         {/* Тумблер знакомства */}
         <div className="flex items-center justify-between pt-1">
           <span className="text-sm font-medium text-slate-700 flex items-center">
-            Соседи знакомы между собой
-            <Hint text="В доме, где люди знают друг друга, труднее думать «поможет кто-то другой» — сложнее оставаться в стороне, когда знаешь человека лично." />
+            Соседи знают друг друга
+            <Hint text="Там, где соседи знают друг друга, труднее переложить ответственность на «кого-то другого»: сложнее остаться в стороне, когда знаешь человека лично." />
           </span>
           <button
             role="switch"
             aria-checked={input.acquaintance}
-            aria-label="Соседи знакомы между собой"
+            aria-label="Соседи знают друг друга"
             onClick={() => update({ acquaintance: !input.acquaintance })}
             className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent
               transition-colors duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2
