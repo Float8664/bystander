@@ -24,6 +24,18 @@ export default function Home() {
           <Calculator />
         </Suspense>
 
+        <div className="text-center">
+          <a
+            href="https://forms.gle/3DksDqEEK6qyrvUi8"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sm text-slate-400 underline underline-offset-2 hover:text-slate-600
+              focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-500"
+          >
+            Расскажи, что непонятно — оставить отзыв
+          </a>
+        </div>
+
         <footer className="text-center text-xs text-slate-300">
           Только для образовательных целей · не является эмпирически валидированным прогнозом
         </footer>
