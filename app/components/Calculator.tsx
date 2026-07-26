@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { computeResult, computeWitnessCount } from "@/src/lib/model/probability"
 import { BUILDING_DEFAULTS } from "@/src/lib/model/constants"
@@ -10,6 +10,12 @@ import GuessPrompt from "./GuessPrompt"
 import Hint from "./Hint"
 import { getWhyText } from "./whyText"
 import { getGuessDelta, getGuessReaction } from "./guessReaction"
+import {
+  getGuessServerSnapshot,
+  getGuessSnapshot,
+  storeGuess,
+  subscribeToGuess,
+} from "./guessStore"
 import type {
   BuildingShape,
   BuildingType,
@@ -244,24 +250,6 @@ function pluralApartments(n: number): string {
   return "квартир"
 }
 
-// Ключ sessionStorage для догадки. Догадка намеренно не хранится в URL:
-// ссылка должна передавать сценарий, но не чужое предположение.
-const GUESS_KEY = "bystander:guess"
-
-// Читает сохранённую догадку. Возвращает null, если её нет, она испорчена
-// или хранилище недоступно (приватный режим) — тогда просто спросим заново.
-function readStoredGuess(): number | null {
-  if (typeof window === "undefined") return null
-  try {
-    const raw = sessionStorage.getItem(GUESS_KEY)
-    if (raw === null) return null
-    const v = Number(raw)
-    return Number.isFinite(v) && v >= 0 && v <= 100 ? Math.round(v) : null
-  } catch {
-    return null
-  }
-}
-
 // ─── Основной компонент ──────────────────────────────────────────────────────
 
 export default function Calculator() {
@@ -364,30 +352,52 @@ export default function Calculator() {
   )
 
   // ─── Догадка пользователя ────────────────────────────────────────────────
-  // Живёт в sessionStorage: переживает перезагрузку вкладки, но НЕ попадает
-  // в URL — иначе получатель ссылки увидел бы чужую догадку вместо своей.
-  // Читаем прямо в инициализаторе useState, а не в эффекте: этот компонент
-  // использует useSearchParams, из-за чего всё поддерево рендерится только
-  // на клиенте (на сервере отдаётся Suspense-заглушка). Рассинхрона при
-  // гидратации быть не может, а лишнего каскадного ре-рендера — тоже.
-  const [guess, setGuess] = useState<number | null>(readStoredGuess)
+  // Живёт в sessionStorage (см. guessStore). Читаем через useSyncExternalStore:
+  // компонент рендерится и на сервере, где sessionStorage нет, и чтение
+  // в инициализаторе useState давало null навсегда — вернувшийся пользователь
+  // снова видел вопрос, хотя догадка была сохранена.
+  const guess = useSyncExternalStore(
+    subscribeToGuess,
+    getGuessSnapshot,
+    getGuessServerSnapshot
+  )
   const [editingGuess, setEditingGuess] = useState(false)
 
   const commitGuess = useCallback((v: number) => {
-    setGuess(v)
+    storeGuess(v)
     setEditingGuess(false)
-    try {
-      sessionStorage.setItem(GUESS_KEY, String(v))
-    } catch {
-      // Не смогли сохранить — догадка всё равно живёт в состоянии до перезагрузки.
-    }
   }, [])
 
   // Показываем результат только когда догадка зафиксирована и не редактируется.
   const showResults = guess !== null && !editingGuess
 
+  // Якорь на блок догадки — из заглушки внизу и при переходе к «изменить догадку».
+  const guessRef = useRef<HTMLDivElement>(null)
+  const scrollToGuess = useCallback(() => {
+    guessRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+  }, [])
+
+  // «Изменить догадку» открывает блок наверху — сам по себе он остался бы
+  // за экраном, поэтому прокручиваем к нему после появления.
+  useEffect(() => {
+    if (editingGuess) scrollToGuess()
+  }, [editingGuess, scrollToGuess])
+
   return (
     <section aria-label="Калькулятор эффекта свидетеля" className="w-full max-w-2xl mx-auto space-y-8">
+
+      {/* Догадка — первое на экране, пока не зафиксирована. Стоит ВЫШЕ формы
+          намеренно: снизу её не замечали и страница читалась как статичная.
+          Параметры дома остаются доступными ниже — их можно менять и после. */}
+      {!showResults && (
+        <div ref={guessRef} className="scroll-mt-6">
+          <GuessPrompt
+            initialValue={guess}
+            onCommit={commitGuess}
+            onCancel={guess !== null ? () => setEditingGuess(false) : undefined}
+          />
+        </div>
+      )}
 
       {/* Форма ввода */}
       <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-6">
@@ -575,14 +585,23 @@ export default function Calculator() {
         </div>
       </div>
 
-      {/* Догадка ещё не зафиксирована (или пользователь её меняет) — вместо
-          результата, эксперимента и графика показываем вопрос. */}
+      {/* Заглушка на месте результата и графика: доскроллив до пустоты,
+          человек понимает причину и знает, куда вернуться. */}
       {!showResults && (
-        <GuessPrompt
-          initialValue={guess}
-          onCommit={commitGuess}
-          onCancel={guess !== null ? () => setEditingGuess(false) : undefined}
-        />
+        <div className="rounded-2xl border-2 border-dashed border-slate-300 bg-white/50 p-8 text-center">
+          <p className="text-sm text-slate-500 leading-relaxed">
+            Результат и график появятся, когда ты зафиксируешь догадку{" "}
+            <span aria-hidden="true">↑</span>
+          </p>
+          <button
+            type="button"
+            onClick={scrollToGuess}
+            className="mt-3 text-sm font-medium text-slate-700 underline underline-offset-2 hover:text-slate-900
+              focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-500"
+          >
+            Вернуться к догадке
+          </button>
+        </div>
       )}
 
       {showResults && guess !== null && (

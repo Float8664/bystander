@@ -5,6 +5,11 @@ import { useState } from "react"
 /**
  * Фиксация догадки пользователя до показа результата.
  * Ползунок 0–100% + кнопка подтверждения. Формул здесь нет — это только ввод.
+ *
+ * Оформлен как ГЛАВНОЕ действие экрана (жирная рамка, крупный заголовок,
+ * заметная кнопка): в мягком варианте блок читался как рядовая секция
+ * и его пропускали.
+ *
  * onCancel передаётся лишь при повторном редактировании: при первом заходе
  * отменять нечего, результат ещё не показан.
  */
@@ -20,18 +25,24 @@ export default function GuessPrompt({
   const [value, setValue] = useState(initialValue ?? 50)
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-5">
+    <div className="rounded-2xl border-2 border-slate-900 bg-white p-6 sm:p-8 shadow-lg space-y-5">
       <div className="space-y-2">
-        <h2 className="text-base font-semibold text-slate-800">
+        <p className="text-xs font-semibold uppercase tracking-widest text-emerald-600">
+          Шаг 1 — твоя догадка
+        </p>
+        <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 leading-tight">
           Сначала предположи
         </h2>
-        <p className="text-sm text-slate-600 leading-relaxed">
+        <p className="text-base text-slate-600 leading-relaxed">
           Как думаешь, каков шанс, что хоть кто-то из соседей среагирует?
         </p>
       </div>
 
       {/* Крупная цифра — то, что пользователь сейчас выбирает */}
-      <p className="text-5xl font-bold text-slate-900 tabular-nums" aria-hidden="true">
+      <p
+        className="text-6xl font-bold text-slate-900 tabular-nums leading-none"
+        aria-hidden="true"
+      >
         {value}%
       </p>
 
@@ -51,8 +62,8 @@ export default function GuessPrompt({
           aria-valuemax={100}
           aria-valuenow={value}
           aria-valuetext={`${value} процентов`}
-          className="w-full h-3 rounded-full appearance-none cursor-pointer bg-slate-200 accent-blue-600
-            focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+          className="w-full h-3 rounded-full appearance-none cursor-pointer bg-slate-200 accent-emerald-600
+            focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600"
         />
         <div className="flex justify-between text-xs text-slate-400">
           <span>0%</span>
@@ -60,12 +71,12 @@ export default function GuessPrompt({
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
         <button
           type="button"
           onClick={() => onCommit(value)}
-          className="rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-medium text-white
-            transition-colors hover:bg-slate-700
+          className="w-full sm:w-auto rounded-xl bg-slate-900 px-6 py-3 text-base font-semibold text-white
+            shadow-sm transition-colors hover:bg-slate-700
             focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
         >
           Зафиксировать догадку
@@ -84,7 +95,7 @@ export default function GuessPrompt({
 
       <p className="text-xs text-slate-400 leading-relaxed">
         Результат и график откроются после того, как ты зафиксируешь догадку.
-        Настройки дома выше можно менять и потом.
+        Параметры дома ниже можно менять и потом.
       </p>
     </div>
   )
