@@ -45,26 +45,42 @@ export default function BystanderChart({ input, houseN, experimentN, guess }: Pr
   // с домом — иначе две точки сольются и запутают.
   const showExperiment = experimentN !== null && experimentN !== houseN
 
-  // Кривые строятся через функции модели — формул в компоненте нет.
+  // Кривая зависит от сценария, но НЕ от neighbors: число соседей — это ось X,
+  // оно подставляется для каждой точки. Поэтому раскладываем input на поля:
+  // так пересчёт идёт только при смене самого сценария, а не при каждом новом
+  // объекте input (он меняется и когда меняется houseN, кривой безразличный).
+  const { severity, timeOfDay, buildingType, position, culturalContext, acquaintance, addressed } =
+    input
+
+  // Кривая строится через функции модели — формул в компоненте нет.
   // При больших axisMax берём не каждое N, а ~80 точек, чтобы не считать тысячи раз.
   const data = useMemo(() => {
+    const scenario = {
+      severity,
+      timeOfDay,
+      buildingType,
+      position,
+      culturalContext,
+      acquaintance,
+      addressed,
+    }
     const sampleStep = Math.max(1, Math.ceil(axisMax / 80))
     const xs: number[] = []
     for (let n = 1; n <= axisMax; n += sampleStep) xs.push(n)
     if (xs[xs.length - 1] !== axisMax) xs.push(axisMax)
     return xs.map((n) => ({
       n,
-      real: pct(computeResult({ ...input, neighbors: n }).pAtLeastOne),
+      real: pct(computeResult({ ...scenario, neighbors: n }).pAtLeastOne),
     }))
   }, [
     axisMax,
-    input.severity,
-    input.timeOfDay,
-    input.buildingType,
-    input.position,
-    input.culturalContext,
-    input.acquaintance,
-    input.addressed,
+    severity,
+    timeOfDay,
+    buildingType,
+    position,
+    culturalContext,
+    acquaintance,
+    addressed,
   ])
 
   // Точку «ваш дом» считаем напрямую через модель, не из выборки data —

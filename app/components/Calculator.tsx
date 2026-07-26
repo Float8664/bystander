@@ -347,14 +347,21 @@ export default function Calculator() {
   // Ползунок-исследование «а что если соседей было бы больше/меньше».
   // experimentN === null, пока слайдер не трогали — на графике только точка «ваш дом».
   const [experimentOpen, setExperimentOpen] = useState(false)
-  const [experimentN, setExperimentN] = useState<number | null>(null)
   const experimentMax = Math.max(50, Math.ceil(houseN * 2))
 
-  // Смена дома (а с ней houseN) сбрасывает эксперимент — чтобы не сравнивать
-  // с устаревшей точкой и не выходить за новую ось графика.
-  useEffect(() => {
-    setExperimentN(null)
-  }, [houseN])
+  // Эксперимент запоминает, для какого дома он поставлен. Сброс при смене дома
+  // не хранится в состоянии, а ВЫВОДИТСЯ: если forHouseN больше не совпадает
+  // с текущим houseN, точка считается устаревшей и не показывается. Так не нужен
+  // эффект с setState — иначе получался лишний каскадный ре-рендер.
+  const [experiment, setExperiment] = useState<{ n: number; forHouseN: number } | null>(null)
+  const experimentN = experiment !== null && experiment.forHouseN === houseN ? experiment.n : null
+
+  const setExperimentN = useCallback(
+    (n: number | null) => {
+      setExperiment(n === null ? null : { n, forHouseN: houseN })
+    },
+    [houseN]
+  )
 
   // ─── Догадка пользователя ────────────────────────────────────────────────
   // Живёт в sessionStorage: переживает перезагрузку вкладки, но НЕ попадает
